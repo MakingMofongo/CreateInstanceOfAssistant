@@ -2,9 +2,9 @@
   "name": "create-instance-assistant",
   "version": "0.0.1",
   "description": "Create an instance of the Receptionist Assistant",
-  "main": "receptionist.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node receptionist.js"
+    "start": "node main.js"
   },
   "repository": {
     "type": "git",

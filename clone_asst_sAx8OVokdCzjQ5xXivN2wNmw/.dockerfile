@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 3000
 
 # Command to run the app.
-CMD ["node", "receptionist.js"]
+CMD ["node", "main.js"]

@@ -43,4 +43,4 @@ function clone(assistant_id) {
 
 // Export the clone function
 module.exports = { clone };
-// clone('asst_test');  // Example usage of the clone function
+clone('asst_sAx8OVokdCzjQ5xXivN2wNmw');  // Example usage of the clone function
