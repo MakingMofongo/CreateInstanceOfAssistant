@@ -22,6 +22,6 @@
     "httpdispatcher": ">=2.1.2"
   },
   "engines": {
-    "node": "= 17.1.x"
+    "node": "= 16.x.x"
   }
 }
