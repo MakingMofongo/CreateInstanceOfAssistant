@@ -38,7 +38,7 @@ app.post('/deploy', async (req, res) => {
     console.log('Deployment Success:', result);
     console.log('Service URL:', serviceUrl);
     // Send both the result and the service URL in the response
-    res.send({ serviceUrl });
+    res.send({serviceUrl});
   } catch (error) {
     console.error('Deployment Failed:', error);
     res.status(500).send({ error: 'Deployment failed', details: error.message });
