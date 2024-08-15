@@ -17,7 +17,7 @@ function sanitizeServiceName(name) {
 }
 
 app.post('/deploy', async (req, res) => {
-  const { assistant_id } = req.body;
+  const assistant_id = req.body;
   log('assistant_id:', assistant_id);
 
   if (!assistant_id) {
