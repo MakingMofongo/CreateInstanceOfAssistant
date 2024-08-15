@@ -17,7 +17,8 @@ function sanitizeServiceName(name) {
 }
 
 app.post('/deploy', async (req, res) => {
-  const assistant_id = req.body;
+  const data = req.body;
+  const assistant_id = data.assistant_id;
   log('assistant_id:', assistant_id);
 
   if (!assistant_id) {
@@ -37,7 +38,7 @@ app.post('/deploy', async (req, res) => {
     console.log('Deployment Success:', result);
     console.log('Service URL:', serviceUrl);
     // Send both the result and the service URL in the response
-    res.send({ serviceUrl, result });
+    res.send({ serviceUrl });
   } catch (error) {
     console.error('Deployment Failed:', error);
     res.status(500).send({ error: 'Deployment failed', details: error.message });
