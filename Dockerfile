@@ -15,4 +15,4 @@ WORKDIR /app
 RUN npm install
 
 # Run the application
-CMD ["npm", "start"]
+CMD ["node", "main.js"]
