@@ -6,9 +6,9 @@ const WebSocketServer = require('websocket').server;
 const TranscriptionService = require('./transcription-service');
 const ElevenLabsTTS = require('./ElevenLabsTTS');
 const { initializeAssistant, createThread, addMessageToThread, createAndPollRun } = require('./LLM');
-
 "use strict";
 require('dotenv').config();
+
 
 
 const dispatcher = new HttpDispatcher();
@@ -27,73 +27,57 @@ const mediaws = new WebSocketServer({
 
 let elevenLabsTTS;
 
-async function initializeServer(assistant_id) {
+async function initializeServer(assistant_id, port = 8080, LLM) {
     console.log('Initializing assistant');
-    await initializeAssistant(assistant_id);  // Pass the assistant_id here
+    await LLM.initializeAssistant(assistant_id);
     console.log('Initializing Eleven Labs TTS');
     elevenLabsTTS = new ElevenLabsTTS(process.env.ELEVENLABS_API_KEY);
-    console.log('Initializing server');
-    wsserver.listen(HTTP_SERVER_PORT, function () {
         console.log("Server listening on: http://localhost:%s", HTTP_SERVER_PORT);
+    
+    const server = http.createServer(handleRequest);
+    const wsServer = new WebSocketServer({
+        httpServer: server,
+        autoAcceptConnections: true,
     });
-}
 
-function handleRequest(request, response) {
-    try {
-        dispatcher.dispatch(request, response);
+    server.listen(port, function () {
+        console.log(`Server listening on: http://localhost:${port}`);
     } catch (err) {
+        console.error(err);
+    wsServer.on('connect', function (connection) {
+        console.log('Media WS: Connection accepted');
+        new MediaStreamHandler(connection, elevenLabsTTS, LLM);
+    });
+
+    return { server, wsServer };
+    res.writeHead(200, {
+        'Content-Type': 'text/xml',
+        'Content-Length': stat.size,
+    });
+});
+
         console.error(err);
     }
 }
 
 dispatcher.onPost('/twiml', function (req, res) {
     log('POST TwiML');
-
+        this.chunk = '';
     const filePath = path.join(__dirname + '/templates', 'streams.xml');
     const stat = fs.statSync(filePath);
 
-    res.writeHead(200, {
-        'Content-Type': 'text/xml',
+    async processMessage(message) {
+        if (message.type === 'utf8') {
         'Content-Length': stat.size,
-    });
+                    console.log('Creating new thread');
 
     const readStream = fs.createReadStream(filePath);
     readStream.pipe(res);
 });
-
-mediaws.on('connect', function (connection) {
-    log('Media WS: Connection accepted');
-    new MediaStreamHandler(connection, elevenLabsTTS);
-});
-
-class MediaStreamHandler {
-    constructor(connection, elevenLabsTTSInstance) {
-        this.connection = connection;
-        this.metaData = null;
-        this.trackHandlers = {};
-        this.hasSeenMedia = false;
-        this.threadId = null;
-        this.elevenLabsTTS = elevenLabsTTSInstance;
-        this.chunk = '';
-        this.pendingAudioChunks = [];
-        this.chunkSno = 0;
-
-        connection.on('message', this.processMessage.bind(this));
-        connection.on('close', this.close.bind(this));
-    }
-
-    async processMessage(message) {
-        if (message.type === 'utf8') {
-            const data = JSON.parse(message.utf8Data);
-            if (data.event === "start") {
-                this.metaData = data.start;
-                if (!this.threadId) {
-                    console.log('Creating new thread');
-                    this.threadId = await createThread();
                 }
             }
-            if (data.event !== "media") {
-                return;
+    log('Media WS: Connection accepted');
+    new MediaStreamHandler(connection, elevenLabsTTS);
             }
             const track = data.media.track;
             if (this.trackHandlers[track] === undefined) {
@@ -102,90 +86,116 @@ class MediaStreamHandler {
 
                 // Send initial message
                 // const initialMessage = "Hei! Täällä Hilton Edinburgh Carltonin tekoälyvastaanotto, kuinka voin auttaa tänään? ";
-                const initialMessage = "Hello! This is the AI reception at Hilton Edinburgh Carlton, how can I help today? ";
+        this.threadId = null;
                 // const initialMessage = " مرحبًا! هذه هي الاستقبال الذكي في هيلتون إدنبرة كارلتون، كيف يمكنني المساعدة اليوم؟ ";
+        this.LLM = LLM;
 
                 await this.elevenLabsTTS.connect();
                 this.chunk = initialMessage;
-                this.sendChunkToTTS(track, data.streamSid);
-
-                service.on('transcription', async (transcription, isFinal) => {
-                    log(`Transcription (${track}): ${transcription}`);
-                    if (isFinal) {
-                        try {
-                            log('Adding final transcription:', transcription, 'to thread:', this.threadId);
-                            await addMessageToThread(this.threadId, transcription);
 
                             // Stream textDelta values from LLM
                             let fullResponse = '';
                             await this.elevenLabsTTS.connect();
-                            const run = createAndPollRun(this.threadId, async (textDelta) => {
-                                fullResponse += textDelta;
-                                this.chunk += textDelta;
-
-                                // Check for punctuation to send chunks
-                                if (/[.,\/;!?:[\]]/.test(textDelta)) {
-                                    // add a single space after punctuation
-                                    this.chunk += ' ';
-                                    this.sendChunkToTTS(track, data.streamSid);
                                 }
                             });
-
                         } catch (error) {
                             console.error('Error processing final transcription:', error);
-                        }
                     }
                 });
-            }
-            this.trackHandlers[track].send(data.media.payload);
-
-            if (!this.hasSeenMedia) {
-                this.hasSeenMedia = true;
-            }
-        } else if (message.type === 'binary') {
+                this.sendStartResponse();
+                if (!this.threadId) {
+                    console.log('Creating new thread');
+                    this.threadId = await this.LLM.createThread();
+                }
             log('Media WS: binary message received (not supported)');
+                await this.handleMediaEvent(data);
+                this.connection.sendUTF(JSON.stringify(message));
+                await this.handleTTSRequest(data);
+            this.trackHandlers[track].close();
+                // Handle stop event if needed
+            }
         }
     }
 
-    sendChunkToTTS(track, streamSid, isLastChunk = false) {
-        if (this.chunk.length > 0) {
-            this.elevenLabsTTS.textToSpeech(this.chunk, (audioChunk, chunkSno) => {
-                const base64AudioChunk = audioChunk.toString('base64');
-                const message = {
-                    event: "media",
-                    streamSid: streamSid,
-                    media: {
-                        track,
-                        payload: base64AudioChunk,
-                    },
-                };
-                this.connection.sendUTF(JSON.stringify(message));
-                log('Sent TTS audio chunk SNO:', chunkSno, 'to client');
+    sendStartResponse() {
+        const response = {
+            event: "start",
+            start: { status: "ready" }
+        };
+        this.connection.sendUTF(JSON.stringify(response));
+    }
+    MediaStreamHandler
+    async handleMediaEvent(data) {
+        const track = data.media.track;
+        if (!this.trackHandlers[track]) {
+            const service = new TranscriptionService();
+            this.trackHandlers[track] = service;
+
+            service.on('transcription', async (transcription, isFinal) => {
+                console.log(`Transcription (${track}): ${transcription}`);
+                if (isFinal) {
+                    this.sendTranscriptionResponse(transcription);
+                    await this.processLLMResponse(transcription);
+                }
+            });
+        }
+        this.trackHandlers[track].send(Buffer.from(data.media.payload, 'base64'));
+    }
+
+    sendTranscriptionResponse(transcription) {
+        const response = {
+            event: "transcription",
+            transcription: transcription
+        };
+        this.connection.sendUTF(JSON.stringify(response));
+    }
+
+    async processLLMResponse(transcription) {
+        try {
+            console.log('Adding final transcription:', transcription, 'to thread:', this.threadId);
+            await this.LLM.addMessageToThread(this.threadId, transcription);
+
+            let fullResponse = '';
+            await this.LLM.createAndPollRun(this.threadId, async (textDelta) => {
+                fullResponse += textDelta;
+                this.sendLLMResponse(textDelta);
+            console.error('Error processing LLM response:', error);
+        }
+    }
+
+    sendLLMResponse(response) {
+        const message = {
+            event: "llm_response",
+            response: response
+        };
+        this.connection.sendUTF(JSON.stringify(message));
+
+    async handleTTSRequest(data) {
+        try {
+            await this.elevenLabsTTS.connect();
+            await this.elevenLabsTTS.textToSpeech(data.text, (audioChunk, chunkSno) => {
+                this.sendAudioChunk(audioChunk, chunkSno, data.isFinal);
             }, (error) => {
                 console.error('Error during TTS:', error);
-            }, isLastChunk);
-            this.chunk = '';
+            }, data.isFinal);
+        } catch (error) {
+            console.error('Error handling TTS request:', error);
         }
     }
 
-    close() {
-        log('Media WS: closed');
-
+    sendAudioChunk(audioChunk, chunkSno, isFinal) {
+        const base64AudioChunk = audioChunk.toString('base64');
+        const message = {
+            event: "media",
+            media: {
+                track: "outbound",
+                payload: base64AudioChunk,
+                chunk: isFinal ? 'end' : chunkSno
+            }
+        };
+        this.connection.sendUTF(JSON.stringify(message));
+        console.log('Media WS: closed');
         for (let track of Object.keys(this.trackHandlers)) {
             this.trackHandlers[track].close();
         }
-
-        // Do not close elevenLabsTTS WebSocket here as it should stay open for the server's lifetime
-    }
-}
-
-const Receptionist = {
-    initializeServer,
-    handleRequest,
-    MediaStreamHandler
-};
-
-module.exports = Receptionist;
-
 initializeServer(process.env.OPENAI_ASSISTANT_ID);  // Initialize the server with the OPENAI_ASSISTANT_ID from the .env file
-
