@@ -1,42 +1,57 @@
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const { log } = require('console');
 
+function sanitizeServiceName(name) {
+    let sanitized = name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    sanitized = sanitized.replace(/^-+|-+$/g, '');
+    return sanitized.slice(0, 63);
+}
+
 function deployment(serviceName, folder_name) {
-    // Add random hash to the service name
-    serviceName = serviceName + Math.random().toString(36).substring(7);
+    serviceName = sanitizeServiceName(serviceName + Math.random().toString(36).substring(7));
     log('serviceName:', serviceName);
 
-    // Variables for name, source, and region
-    const sourcePath = folder_name; // Use the folder_name parameter for the source path
+    const sourcePath = folder_name;
     const region = 'asia-south1';
 
-    // Construct the gcloud command using the variables
     const command = `gcloud run deploy ${serviceName} --source ${sourcePath} --region=${region} --allow-unauthenticated`;
+    log('Executing command:', command);
 
     return new Promise((resolve, reject) => {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                reject({ success: false, message: error.message });
+        const process = spawn('cmd', ['/c', command], { shell: true });
+        let output = '';
+
+        process.stdout.on('data', (data) => {
+            const chunk = data.toString();
+            output += chunk;
+            log('Deployment output:', chunk);
+        });
+
+        process.stderr.on('data', (data) => {
+            const chunk = data.toString();
+            output += chunk;
+            log('Deployment:', chunk);
+        });
+
+        process.on('close', (code) => {
+            log(`Deployment process exited with code ${code}`);
+            if (code !== 0) {
+                reject({ success: false, message: `Command failed with code ${code}`, output });
                 return;
             }
 
-            // Combine stdout and stderr to search for the URL
-            const combinedOutput = `${stdout}\n${stderr}`;
-
-            // Enhanced regex to capture the Service URL
-            const urlMatch = combinedOutput.match(/Service URL:\s*(https:\/\/[^\s]+)/);
+            const urlMatch = output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
 
             if (urlMatch) {
-                resolve({ success: true, serviceUrl: urlMatch[1], message: combinedOutput });
+                resolve({ success: true, serviceUrl: urlMatch[1], message: output });
             } else {
-                reject({ success: false, message: 'Service URL not found in the output.' });
+                reject({ success: false, message: 'Service URL not found in the output.', output });
             }
         });
     });
 }
 
-// Export the deployment function
-module.exports = { deployment };
+module.exports = { deployment, sanitizeServiceName };
 
 // // Example usage with async/await
 // (async () => {
