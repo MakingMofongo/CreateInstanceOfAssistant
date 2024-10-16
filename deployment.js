@@ -41,11 +41,17 @@ function deployment(serviceName, folder_name) {
             }
 
             const urlMatch = output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
+            const fullServiceNameMatch = output.match(/Service \[([^\]]+)\] revision/);
 
-            if (urlMatch) {
-                resolve({ success: true, serviceUrl: urlMatch[1], message: output });
+            if (urlMatch && fullServiceNameMatch) {
+                resolve({ 
+                    success: true, 
+                    serviceUrl: urlMatch[1], 
+                    fullServiceName: fullServiceNameMatch[1],
+                    message: output 
+                });
             } else {
-                reject({ success: false, message: 'Service URL not found in the output.', output });
+                reject({ success: false, message: 'Service URL or full service name not found in the output.', output });
             }
         });
     });
@@ -53,12 +59,12 @@ function deployment(serviceName, folder_name) {
 
 module.exports = { deployment, sanitizeServiceName };
 
-// // Example usage with async/await
-// (async () => {
-//     try {
-//         const result = await deployment('scripttest', 'clone_asst_sAx8OVokdCzjQ5xXivN2wNmw');
-//         console.log('Deployment Success:', result);
-//     } catch (error) {
-//         console.error('Deployment Failed:', error);
-//     }
-// })();
+// Example usage with async/await
+(async () => {
+    try {
+        const result = await deployment('scripttest', 'clone_asst_sAx8OVokdCzjQ5xXivN2wNmw');
+        console.log('Deployment Success:', result);
+    } catch (error) {
+        console.error('Deployment Failed:', error);
+    }
+})();

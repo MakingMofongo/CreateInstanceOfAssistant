@@ -4,9 +4,6 @@ FROM node:18-alpine
 # Set the working directory inside the container.
 WORKDIR /app
 
-# Set the environment variable for the host
-ENV HOST 0.0.0.0
-
 # Copy package.json and package-lock.json to the working directory.
 COPY package*.json ./
 
@@ -17,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Expose the port that your application will run on.
-EXPOSE 8080
+EXPOSE 3000
 
-# Command to run the app and keep the container running
-CMD npm start || tail -f /dev/null
+# Command to run the app.
+CMD ["node", "receptionist.js"]
