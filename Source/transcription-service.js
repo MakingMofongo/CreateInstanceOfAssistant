@@ -4,6 +4,11 @@ const { SpeechClient } = require('@google-cloud/speech').v2;
 "use strict";
 require('dotenv').config();
 
+function logWithTimestamp(message, ...args) {
+  const timestamp = new Date().toISOString();
+  console.log(timestamp, '\x1b[38;5;208mTRANSCRIPTION: \x1b[0m', message, ...args);
+}
+
 class TranscriptionService extends EventEmitter {
   constructor() {
     super();
@@ -15,7 +20,9 @@ class TranscriptionService extends EventEmitter {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 1000; // Start with 1 second
-    console.log('TranscriptionService initialized with project ID:', this.projectId);
+    this.newStreamNeeded = false;
+    this.isCreatingStream = false;
+    logWithTimestamp('TranscriptionService initialized with project ID:', this.projectId);
   }
   
   async send(payload) {
@@ -32,17 +39,17 @@ class TranscriptionService extends EventEmitter {
           });
         });
       } else {
-        console.log('Stream is not valid. Skipping payload.');
+        logWithTimestamp('Stream is not valid. Skipping payload.');
       }
     } catch (error) {
-      console.error('Error sending payload:', error);
+      logWithTimestamp('Error sending payload:', error);
       throw error; // Rethrow the error to be caught in the test
     }
   }
 
   close() {
     if (this.recognizeStream) {
-      console.log('Closing stream');
+      logWithTimestamp('Closing stream');
       this.recognizeStream.destroy();
       this.recognizeStream = null;
       this.isStreamValid = false;
@@ -50,7 +57,15 @@ class TranscriptionService extends EventEmitter {
   }
 
   newStreamRequired() {
+    // console.log('Checking if new stream is required');
+    const noRecognizeStream = !this.recognizeStream;
+    const streamInvalid = !this.isStreamValid;
+    const ageExceeded = this.streamAgeExceeded();
+    // console.log('No recognize stream:', noRecognizeStream);
+    // console.log('Stream invalid:', streamInvalid);
+    // console.log('Age exceeded:', ageExceeded);
     return !this.recognizeStream || !this.isStreamValid || this.streamAgeExceeded();
+
   }
 
   streamAgeExceeded() {
@@ -62,56 +77,76 @@ class TranscriptionService extends EventEmitter {
   }
 
   async getStream() {
+    if (this.isCreatingStream) {
+      logWithTimestamp('Stream creation already in progress. Waiting...');
+      await this.waitForStreamCreation();
+    }
+
     if (this.newStreamRequired()) {
-      this.close();
-
-      const recognitionConfig = {
-        autoDecodingConfig: {},
-        explicitDecodingConfig: {
-          encoding: "MULAW",
-          sampleRateHertz: 8000,
-          audioChannelCount: 1,
-        },
-        languageCodes: ["en-US", "fi-FI", "ar-SA"],
-        model: "long"
-      };
-
-      const streamingRecognitionConfig = {
-        config: recognitionConfig,
-        streamingFeatures: {
-          interimResults: true,
-        }
-      };
-
-      console.log('GOOGLE_CLOUD_PROJECT:', this.projectId);
-      const streamingRecognizeRequest = {
-        recognizer: `projects/${this.projectId}/locations/global/recognizers/_`,
-        streamingConfig: streamingRecognitionConfig,
-      };
-
-      console.log('Creating new stream with config:', JSON.stringify(streamingRecognizeRequest));
-      this.streamCreatedAt = new Date();
-      this.recognizeStream = this.client
-        ._streamingRecognize()
-        .on("error", async (error) => { // Async handler for proper reconnection
-          console.error('Stream error:', error);
-          this.isStreamValid = false;
-          this.emit('error', error);
-          await this.handleStreamError(error);
-        })
-        .on("data", (data) => {
-          const result = data.results[0];
-          if (result === undefined || result.alternatives[0] === undefined) {
-            console.log('Received data with no valid results');
-            return;
-          }
-          const transcription = result.alternatives[0].transcript;
-          console.log(`Emitting transcription: "${transcription}", isFinal: ${result.isFinal}`);
-          this.emit('transcription', transcription, result.isFinal); // Emit immediately
-        });
-
-      // Initialize the stream
+      logWithTimestamp('New stream required');
+      this.isCreatingStream = true;
       try {
+        this.close();
+        
+        const recognitionConfig = {
+          autoDecodingConfig: {},
+          explicitDecodingConfig: {
+            encoding: "MULAW",
+            sampleRateHertz: 8000,
+            audioChannelCount: 1,
+          },
+          languageCodes: ["en-US", "fi-FI", "ar-SA"],
+          model: "long"
+        };
+
+        const streamingRecognitionConfig = {
+          config: recognitionConfig,
+          streamingFeatures: {
+            interimResults: true,
+          }
+        };
+
+        logWithTimestamp('GOOGLE_CLOUD_PROJECT:', this.projectId);
+        const streamingRecognizeRequest = {
+          recognizer: `projects/${this.projectId}/locations/global/recognizers/_`,
+          streamingConfig: streamingRecognitionConfig,
+        };
+
+        logWithTimestamp('Creating new stream with config:', JSON.stringify(streamingRecognizeRequest));
+        this.streamCreatedAt = new Date();
+        this.recognizeStream = this.client
+          ._streamingRecognize()
+          .on("error", async (error) => {
+            logWithTimestamp('Stream error:', error);
+            this.isStreamValid = false;
+            this.emit('error', error);
+            await this.handleStreamError(error);
+          })
+          .on("data", async (data) => {
+            const results = data.results;
+            if (!results || results.length === 0) {
+              logWithTimestamp('Received data with no valid results');
+              return;
+            }
+
+            for (const result of results) {
+              if (result.alternatives && result.alternatives.length > 0) {
+                const transcription = result.alternatives[0].transcript;
+                logWithTimestamp(`Emitting transcription: "${transcription}", isFinal: ${result.isFinal}`);
+                this.emit('transcription', transcription, result.isFinal);
+
+                // Close and reconnect the stream after a final transcription
+                if (result.isFinal) {
+                  logWithTimestamp('Final transcription received. Closing and reconnecting stream.');
+                  this.close();
+                  await this.getStream();
+                  break; // Exit the loop after processing the final result
+                }
+              }
+            }
+          });
+
+        // Initialize the stream
         await new Promise((resolve, reject) => {
           this.recognizeStream.write(streamingRecognizeRequest, (error) => {
             if (error) {
@@ -122,36 +157,44 @@ class TranscriptionService extends EventEmitter {
             }
           });
         });
-        console.log('New stream created and initialized');
+        logWithTimestamp('New stream created and initialized');
         this.reconnectAttempts = 0; // Reset on successful connect
       } catch (error) {
-        console.error('Error initializing stream:', error);
+        logWithTimestamp('Error initializing stream:', error);
         this.isStreamValid = false;
         await this.handleStreamError(error);
         throw error;
+      } finally {
+        this.isCreatingStream = false;
       }
     }
 
     return this.recognizeStream;
   }
 
+  async waitForStreamCreation() {
+    while (this.isCreatingStream) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
   async handleStreamError(error) {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnect attempts reached. Not reconnecting.');
+      logWithTimestamp('Max reconnect attempts reached. Not reconnecting.');
       return;
     }
 
     this.reconnectAttempts += 1;
     const delay = this.reconnectDelay * this.reconnectAttempts; // Exponential backoff
-    console.log(`Attempting to reconnect in ${delay}ms (Attempt ${this.reconnectAttempts})`);
+    logWithTimestamp(`Attempting to reconnect in ${delay}ms (Attempt ${this.reconnectAttempts})`);
 
     await new Promise(resolve => setTimeout(resolve, delay));
 
     try {
       await this.getStream();
-      console.log('Reconnected successfully.');
+      logWithTimestamp('Reconnected successfully.');
     } catch (err) {
-      console.error('Reconnection attempt failed:', err);
+      logWithTimestamp('Reconnection attempt failed:', err);
       await this.handleStreamError(err); // Recursive with increased attempts
     }
   }

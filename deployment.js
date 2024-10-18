@@ -1,5 +1,7 @@
 const { spawn } = require('child_process');
 const { log } = require('console');
+const path = require('path');
+const fs = require('fs');
 
 function sanitizeServiceName(name) {
     let sanitized = name.toLowerCase().replace(/[^a-z0-9-]/g, '');
@@ -7,14 +9,65 @@ function sanitizeServiceName(name) {
     return sanitized.slice(0, 63);
 }
 
-function deployment(serviceName, folder_name) {
-    serviceName = sanitizeServiceName(serviceName + Math.random().toString(36).substring(7));
+function generateRandomString() {
+    return Math.random().toString(36).substring(2, 8);
+}
+
+function deployment(serviceName, folder_name, randomSuffix) {
+    serviceName = sanitizeServiceName(serviceName + '-' + randomSuffix);
     log('serviceName:', serviceName);
 
-    const sourcePath = folder_name;
-    const region = 'asia-south1';
+    let command;
+    if (folder_name === null) {
+        // For empty deployment, create a simple Express server
+        const tempDir = 'temp_empty_service';
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir);
+        }
+        
+        // Create package.json
+        const packageJson = {
+            "name": "empty-service",
+            "version": "1.0.0",
+            "main": "server.js",
+            "dependencies": {
+                "express": "^4.17.1"
+            }
+        };
+        fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
 
-    const command = `gcloud run deploy ${serviceName} --source ${sourcePath} --region=${region} --allow-unauthenticated`;
+        // Create server.js
+        const serverContent = `
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 8080;
+
+app.get('/', (req, res) => {
+    res.send('Empty Service Running');
+});
+
+app.listen(port, () => {
+    console.log(\`Server running on port \${port}\`);
+});
+`;
+        fs.writeFileSync(path.join(tempDir, 'server.js'), serverContent);
+
+        // Create Dockerfile
+        const dockerfileContent = `
+FROM node:14
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+CMD [ "node", "server.js" ]
+`;
+        fs.writeFileSync(path.join(tempDir, 'Dockerfile'), dockerfileContent);
+        
+        command = `gcloud run deploy ${serviceName} --source ${tempDir} --region=asia-south1 --allow-unauthenticated`;
+    } else {
+        command = `gcloud run deploy ${serviceName} --source ${folder_name} --region=asia-south1 --allow-unauthenticated`;
+    }
+
     log('Executing command:', command);
 
     return new Promise((resolve, reject) => {
@@ -30,7 +83,7 @@ function deployment(serviceName, folder_name) {
         process.stderr.on('data', (data) => {
             const chunk = data.toString();
             output += chunk;
-            log('Deployment:', chunk);
+            log('Deployment Info:', chunk);
         });
 
         process.on('close', (code) => {
@@ -53,18 +106,23 @@ function deployment(serviceName, folder_name) {
             } else {
                 reject({ success: false, message: 'Service URL or full service name not found in the output.', output });
             }
+
+            // Clean up temporary directory if it was created
+            if (folder_name === null) {
+                fs.rmSync('temp_empty_service', { recursive: true, force: true });
+            }
         });
     });
 }
 
-module.exports = { deployment, sanitizeServiceName };
+module.exports = { deployment, sanitizeServiceName, generateRandomString };
 
 // Example usage with async/await
-(async () => {
-    try {
-        const result = await deployment('scripttest', 'clone_asst_sAx8OVokdCzjQ5xXivN2wNmw');
-        console.log('Deployment Success:', result);
-    } catch (error) {
-        console.error('Deployment Failed:', error);
-    }
-})();
+// (async () => {
+//     try {
+//         const result = await deployment('scripttest', 'clone_asst_sAx8OVokdCzjQ5xXivN2wNmw');
+//         console.log('Deployment Success:', result);
+//     } catch (error) {
+//         console.error('Deployment Failed:', error);
+//     }
+// })();

@@ -8,10 +8,11 @@ const sourceFiles = [
     '.env',
     'transcription-service.js',
     '.dockerfile',
-    'package.json'
+    'package.json',
+    'google_creds.json'
 ];
 
-function clone(assistant_id) {
+function clone(assistant_id, serviceUrl) {
     const newFolderName = `clone_${assistant_id}`;
     const folderPath = path.join(__dirname, newFolderName);
 
@@ -28,6 +29,21 @@ function clone(assistant_id) {
     fs.mkdirSync(path.join(__dirname, newFolderName, 'templates'));
     // Copy the 'streams.xml' file to the 'templates' folder
     fs.copyFileSync(path.join(__dirname, 'Source', 'templates', 'streams.xml'), path.join(__dirname, newFolderName, 'templates', 'streams.xml'));
+
+    // Modify streams.xml with the provided serviceUrl
+    const streamsXmlPath = path.join(__dirname, newFolderName, 'templates', 'streams.xml');
+    let streamsXmlContent = fs.readFileSync(streamsXmlPath, 'utf8');
+    
+    if (serviceUrl) {
+        // Convert https:// to wss:// and add /streams at the end
+        const wssUrl = serviceUrl.replace('https://', 'wss://') + '/streams';
+        streamsXmlContent = streamsXmlContent.replace(/wss:\/\/[^"]+/g, wssUrl);
+        
+        fs.writeFileSync(streamsXmlPath, streamsXmlContent);
+        console.log(`streams.xml has been updated with service URL: ${wssUrl}`);
+    } else {
+        console.log('No serviceUrl provided. streams.xml was not modified.');
+    }
 
     // Copy each source file to the new folder
     sourceFiles.forEach((file) => {
@@ -49,4 +65,6 @@ function clone(assistant_id) {
 
 // Export the clone function
 module.exports = { clone };
-clone('asst_sAx8OVokdCzjQ5xXivN2wNmw')  // Example usage of the clo``ne function
+
+// Remove or comment out the following line to prevent automatic execution
+// clone('asst_sAx8OVokdCzjQ5xXivN2wNmw')  // Example usage of the clone function

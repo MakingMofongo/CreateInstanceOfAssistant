@@ -2,7 +2,7 @@
 <Response>
   <Say>Test start, Elevenlabs taking over</Say>
   <Connect>
-    <Stream url="wss://d5f9-2409-40f0-3008-7800-6c70-43df-9a5-7fbb.ngrok-free.app/streams">
+    <Stream url="wss://909a-49-204-26-54.ngrok-free.app/streams">
       <Parameter name="aCutomParameter" value="aCustomValue that was set in TwiML" />
     </Stream>
   </Connect>

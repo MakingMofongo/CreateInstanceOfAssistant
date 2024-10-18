@@ -1,20 +1,11 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { clone } = require('./cloner');
-const { deployment } = require('./deployment');
+const { deployment, sanitizeServiceName, generateRandomString } = require('./deployment');
 const { log } = require('console');
 
 const app = express();
 app.use(bodyParser.json());
-
-function sanitizeServiceName(name) {
-  // Convert to lowercase, replace invalid characters, and truncate to 63 characters
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')  // Replace anything not alphanumeric or dash with a dash
-    .substring(0, 50)              // Limit the length to 63 characters
-    .replace(/^-+|-+$/g, '');      // Remove leading or trailing dashes
-}
 
 app.post('/deploy', async (req, res) => {
   const data = req.body;
@@ -26,19 +17,27 @@ app.post('/deploy', async (req, res) => {
     return;
   }
 
-  // Clone the necessary files
-  const folder_name = clone(assistant_id);
+  const serviceName = sanitizeServiceName(assistant_id);
+  const randomSuffix = generateRandomString();
 
   try {
-    console.log('Deploying the service...');
-    // 
-    serviceName = sanitizeServiceName(assistant_id);
-    const result = await deployment(serviceName, folder_name);
-    const serviceUrl = result.serviceUrl;
-    console.log('Deployment Success:', result);
-    console.log('Service URL:', serviceUrl);
-    // Send both the result and the service URL in the response
-    res.send({serviceUrl});
+    console.log('Deploying the empty service to obtain the URL...');
+    // Deploy the empty service first
+    const emptyServiceResult = await deployment(serviceName, null, randomSuffix);
+    const emptyServiceUrl = emptyServiceResult.serviceUrl;
+    console.log('Empty Service Deployment Success:', emptyServiceResult);
+
+    // Clone the necessary files with the obtained service URL
+    console.log('Cloning the project with the service URL...');
+    const folder_name = clone(assistant_id, emptyServiceUrl);
+
+    console.log('Redeploying the cloned service...');
+    const clonedServiceResult = await deployment(serviceName, folder_name, randomSuffix);
+    const clonedServiceUrl = clonedServiceResult.serviceUrl;
+    console.log('Cloned Service Deployment Success:', clonedServiceResult);
+
+    // Send the cloned service URL in the response
+    res.send({ serviceUrl: clonedServiceUrl });
   } catch (error) {
     console.error('Deployment Failed:', error);
     res.status(500).send({ error: 'Deployment failed', details: error.message });
