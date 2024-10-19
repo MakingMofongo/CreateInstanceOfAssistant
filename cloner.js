@@ -25,8 +25,10 @@ function clone(assistant_id, serviceUrl) {
 
     // Create the new folder
     fs.mkdirSync(newFolderName);
+    
     // Create 'templates' folder in the new folder
     fs.mkdirSync(path.join(__dirname, newFolderName, 'templates'));
+    
     // Copy the 'streams.xml' file to the 'templates' folder
     fs.copyFileSync(path.join(__dirname, 'Source', 'templates', 'streams.xml'), path.join(__dirname, newFolderName, 'templates', 'streams.xml'));
 
@@ -53,6 +55,22 @@ function clone(assistant_id, serviceUrl) {
         fs.copyFileSync(sourceFilePath, destinationFilePath);
     });
 
+    // Clone the public folder
+    const publicSourcePath = path.join(__dirname, 'Source', 'public');
+    const publicDestPath = path.join(__dirname, newFolderName, 'public');
+    
+    if (fs.existsSync(publicSourcePath)) {
+        fs.mkdirSync(publicDestPath);
+        fs.readdirSync(publicSourcePath).forEach((file) => {
+            const srcFile = path.join(publicSourcePath, file);
+            const destFile = path.join(publicDestPath, file);
+            fs.copyFileSync(srcFile, destFile);
+        });
+        console.log('Public folder has been cloned.');
+    } else {
+        console.log('Public folder not found in the source. Skipping...');
+    }
+
     // Modify the cloned .env file with the new assistant_id value in the OPENAI_ASSISTANT_ID key
     const envFilePath = path.join(__dirname, newFolderName, '.env');
     const envFileContent = fs.readFileSync(envFilePath, 'utf8');
@@ -67,4 +85,4 @@ function clone(assistant_id, serviceUrl) {
 module.exports = { clone };
 
 // Remove or comment out the following line to prevent automatic execution
-// clone('asst_sAx8OVokdCzjQ5xXivN2wNmw')  // Example usage of the clone function
+clone('asst_sAx8OVokdCzjQ5xXivN2wNmw')  // Example usage of the clone function

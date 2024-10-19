@@ -22,6 +22,7 @@ class TranscriptionService extends EventEmitter {
     this.reconnectDelay = 1000; // Start with 1 second
     this.newStreamNeeded = false;
     this.isCreatingStream = false;
+    this.languageCodes = ["en-US", "fi-FI", "ar-SA"]; // Default language codes
     logWithTimestamp('TranscriptionService initialized with project ID:', this.projectId);
   }
   
@@ -76,6 +77,90 @@ class TranscriptionService extends EventEmitter {
     return isStreamAgeExceeded;
   }
 
+  async testLanguageCodes(languages) {
+    console.log('TranscriptionService: Testing language codes:', languages);
+    const testClient = new SpeechClient();
+    
+    const recognitionConfig = {
+      autoDecodingConfig: {},
+      explicitDecodingConfig: {
+        encoding: "MULAW",
+        sampleRateHertz: 8000,
+        audioChannelCount: 1,
+      },
+      languageCodes: languages,
+      model: "long"
+    };
+
+    const streamingRecognitionConfig = {
+      config: recognitionConfig,
+      streamingFeatures: {
+        interimResults: true,
+      }
+    };
+
+    const streamingRecognizeRequest = {
+      recognizer: `projects/${this.projectId}/locations/global/recognizers/_`,
+      streamingConfig: streamingRecognitionConfig,
+    };
+
+    try {
+      console.log('TranscriptionService: Creating test stream...');
+      console.log('TranscriptionService: Test stream config:', JSON.stringify(streamingRecognizeRequest));
+      const testStream = testClient._streamingRecognize();
+      
+      // Initialize the stream
+      console.log('TranscriptionService: Initializing test stream...');
+      await new Promise((resolve, reject) => {
+        testStream.write(streamingRecognizeRequest, (error) => {
+          if (error) {
+            console.error('TranscriptionService: Error initializing test stream:', error);
+            reject(error);
+          } else {
+            console.log('TranscriptionService: Test stream initialized successfully');
+            resolve();
+          }
+        });
+      });
+
+      // Simulate sending some audio data
+      const dummyAudioData = Buffer.from('dummy audio data');
+      testStream.write({ audio: dummyAudioData });
+
+      // Wait for a short period to allow for potential errors
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // If we reach here, the stream was created successfully
+      testStream.destroy();
+      console.log('TranscriptionService: Language codes validated successfully');
+    } catch (error) {
+      console.error('TranscriptionService: Error validating language codes:', error);
+      throw new Error(`Invalid language codes: ${error.message}`);
+    }
+  }
+
+  setLanguageCodes(languages) {
+    console.log('TranscriptionService: Setting language codes:', languages);
+    this.languageCodes = languages;
+
+    if (this.languageCodes.length === 0) {
+      console.warn('No languages provided. Defaulting to en-US');
+      this.languageCodes = ['en-US'];
+    }
+
+    this.newStreamNeeded = true;
+    logWithTimestamp('Language codes updated:', this.languageCodes);
+  }
+
+  forceNewStream() {
+    logWithTimestamp('Forcing new stream with updated config');
+    this.close();
+    this.newStreamNeeded = true;
+    this.getStream().catch(error => {
+      console.error('Error creating new stream after forced update:', error);
+    });
+  }
+
   async getStream() {
     if (this.isCreatingStream) {
       logWithTimestamp('Stream creation already in progress. Waiting...');
@@ -95,7 +180,7 @@ class TranscriptionService extends EventEmitter {
             sampleRateHertz: 8000,
             audioChannelCount: 1,
           },
-          languageCodes: ["en-US", "fi-FI", "ar-SA"],
+          languageCodes: this.languageCodes, // Use the updated language codes
           model: "long"
         };
 

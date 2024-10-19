@@ -7,61 +7,140 @@ const TranscriptionService = require('./transcription-service');
 const ElevenLabsTTS = require('./ElevenLabsTTS');
 const { initializeAssistant, createThread, addMessageToThread, createAndPollRun } = require('./LLM');
 const process = require('process');
+const cors = require('cors');
+const url = require('url');
+const xml2js = require('xml2js');
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 
 "use strict";
 require('dotenv').config();
 
-
+const app = express();
+const server = http.createServer(app);
 const dispatcher = new HttpDispatcher();
-const wsserver = http.createServer(handleRequest);
 
-const HTTP_SERVER_PORT = 8080;
+const HTTP_SERVER_PORT = process.env.PORT || 8080;
 
 function log(message, ...args) {
     console.log(new Date(), message, ...args);
 }
 
 const mediaws = new WebSocketServer({
-    httpServer: wsserver,
+    httpServer: server,
     autoAcceptConnections: true,
 });
 
 let elevenLabsTTS;
+let currentLanguages = ["en-US", "fi-FI", "ar-SA"]; // Default languages
+let globalTrackHandlers = {};
+let connectedAssistantUrl = '';
 
-async function initializeServer(assistant_id) {
-    console.log('Initializing assistant');
-    await initializeAssistant(assistant_id);  // Pass the assistant_id here
-    console.log('Initializing Eleven Labs TTS');
-    elevenLabsTTS = new ElevenLabsTTS(process.env.ELEVENLABS_API_KEY);
-    console.log('Initializing server');
-    wsserver.listen(HTTP_SERVER_PORT, function () {
-        console.log("Server listening on: http://localhost:%s", HTTP_SERVER_PORT);
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const DEV_CONSOLE_USERNAME = process.env.DEV_CONSOLE_USERNAME;
+const DEV_CONSOLE_PASSWORD = process.env.DEV_CONSOLE_PASSWORD;
+
+// Middleware
+app.use(express.json());
+app.use(express.static('public'));
+app.use(cookieParser());
+app.use(cors());
+
+// Authentication middleware
+function authenticateToken(req, res, next) {
+    const token = req.cookies.token;
+    if (token == null) return res.redirect('/login');
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.redirect('/login');
+        req.user = user;
+        next();
     });
 }
 
-function handleRequest(request, response) {
-    try {
-        dispatcher.dispatch(request, response);
-    } catch (err) {
-        console.error(err);
-    }
+async function initializeServer(assistant_id) {
+    console.log('Initializing assistant');
+    await initializeAssistant(assistant_id);
+    console.log('Initializing Eleven Labs TTS');
+    elevenLabsTTS = new ElevenLabsTTS(process.env.ELEVENLABS_API_KEY);
+    console.log('Initializing server');
+    extractUrlFromXml();
+    server.listen(HTTP_SERVER_PORT, () => {
+        console.log(`Server listening on: http://localhost:${HTTP_SERVER_PORT}`);
+        console.log("Server is ready to handle requests");
+    });
 }
 
-dispatcher.onPost('/twiml', function (req, res) {
+// TwiML handling
+app.post('/twiml', (req, res) => {
     log('POST TwiML');
-
-    const filePath = path.join(__dirname + '/templates', 'streams.xml');
+    const filePath = path.join(__dirname, 'templates', 'streams.xml');
     const stat = fs.statSync(filePath);
-
     res.writeHead(200, {
         'Content-Type': 'text/xml',
         'Content-Length': stat.size,
     });
-
     const readStream = fs.createReadStream(filePath);
     readStream.pipe(res);
 });
 
+// Login routes
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    if (username === DEV_CONSOLE_USERNAME && password === DEV_CONSOLE_PASSWORD) {
+        const token = jwt.sign({ username: DEV_CONSOLE_USERNAME }, JWT_SECRET, { expiresIn: '1h' });
+        res.cookie('token', token, { httpOnly: true, maxAge: 3600000 }); // 1 hour
+        res.json({ success: true });
+    } else {
+        res.json({ success: false });
+    }
+});
+
+// Protected routes
+app.get('/language-settings', authenticateToken, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'language-settings.html'));
+});
+
+app.get('/current-languages', authenticateToken, (req, res) => {
+    res.json({ languages: currentLanguages });
+});
+
+app.get('/connected-assistant', authenticateToken, (req, res) => {
+    res.json({ url: connectedAssistantUrl });
+});
+
+app.post('/change-languages', authenticateToken, (req, res) => {
+    const { languages } = req.body;
+    if (!Array.isArray(languages) || languages.length === 0 || languages.length > 6) {
+        return res.status(400).json({ error: 'Invalid languages array. Must contain 1-6 language codes.' });
+    }
+    
+    const testService = new TranscriptionService();
+    testService.testLanguageCodes(languages)
+        .then(() => {
+            Object.values(globalTrackHandlers).forEach(handler => {
+                if (handler instanceof TranscriptionService) {
+                    handler.setLanguageCodes(languages);
+                    handler.forceNewStream(); // Force new stream with updated config
+                }
+            });
+            currentLanguages = languages;
+            res.json({ message: 'Languages updated successfully', updatedLanguages: currentLanguages });
+        })
+        .catch(error => {
+            res.status(400).json({ error: 'Invalid language codes', details: error.message });
+        })
+        .finally(() => {
+            testService.close();
+        });
+});
+
+// WebSocket handling
 mediaws.on('connect', function (connection) {
     log('Media WS: Connection accepted');
     new MediaStreamHandler(connection, elevenLabsTTS);
@@ -99,13 +178,11 @@ class MediaStreamHandler {
             const track = data.media.track;
             if (this.trackHandlers[track] === undefined) {
                 const service = new TranscriptionService();
+                service.setLanguageCodes(currentLanguages);
                 this.trackHandlers[track] = service;
+                globalTrackHandlers[track] = service;
 
-                // Send initial message
-                // const initialMessage = "Hei! Täällä Hilton Edinburgh Carltonin tekoälyvastaanotto, kuinka voin auttaa tänään? ";
                 const initialMessage = "Hello! This is the AI reception at Hilton Edinburgh Carlton, how can I help today? ";
-                // const initialMessage = " مرحبًا! هذه هي الاستقبال الذكي في هيلتون إدنبرة كارلتون، كيف يمكنني المساعدة اليوم؟ ";
-
                 await this.elevenLabsTTS.connect();
                 this.chunk = initialMessage;
                 this.sendChunkToTTS(track, data.streamSid);
@@ -117,16 +194,13 @@ class MediaStreamHandler {
                             log('Adding final transcription:', transcription, 'to thread:', this.threadId);
                             await addMessageToThread(this.threadId, transcription);
 
-                            // Stream textDelta values from LLM
                             let fullResponse = '';
                             await this.elevenLabsTTS.connect();
                             const run = createAndPollRun(this.threadId, async (textDelta) => {
                                 fullResponse += textDelta;
                                 this.chunk += textDelta;
 
-                                // Check for punctuation to send chunks
                                 if (/[.,\/;!?:[\]]/.test(textDelta)) {
-                                    // add a single space after punctuation
                                     this.chunk += ' ';
                                     this.sendChunkToTTS(track, data.streamSid);
                                 }
@@ -148,56 +222,67 @@ class MediaStreamHandler {
         }
     }
 
-    sendChunkToTTS(track, streamSid, isLastChunk = false) {
+    async sendChunkToTTS(track, streamSid, isLastChunk = false) {
         if (this.chunk.length > 0) {
-            this.elevenLabsTTS.textToSpeech(this.chunk, (audioChunk, chunkSno) => {
-                const base64AudioChunk = audioChunk.toString('base64');
-                const message = {
-                    event: "media",
-                    streamSid: streamSid,
-                    media: {
-                        track,
-                        payload: base64AudioChunk,
-                    },
-                };
-                this.connection.sendUTF(JSON.stringify(message));
-                log('Sent TTS audio chunk SNO:', chunkSno, 'to client');
-            }, (error) => {
-                console.error('Error during TTS:', error);
-            }, isLastChunk);
-            this.chunk = '';
+            try {
+                await this.elevenLabsTTS.textToSpeech(this.chunk, (audioChunk, chunkSno) => {
+                    const base64AudioChunk = audioChunk.toString('base64');
+                    const message = {
+                        event: "media",
+                        streamSid: streamSid,
+                        media: {
+                            track,
+                            payload: base64AudioChunk,
+                        },
+                    };
+                    this.connection.sendUTF(JSON.stringify(message));
+                    log('Sent TTS audio chunk SNO:', chunkSno, 'to client');
+                }, (error) => {
+                    console.error('Error during TTS:', error);
+                }, isLastChunk);
+                this.chunk = '';
+            } catch (error) {
+                console.error('Error in sendChunkToTTS:', error);
+            }
         }
     }
 
     close() {
         log('Media WS: closed');
-
         for (let track of Object.keys(this.trackHandlers)) {
             this.trackHandlers[track].close();
+            delete globalTrackHandlers[track];
         }
-
-        // Do not close elevenLabsTTS WebSocket here as it should stay open for the server's lifetime
     }
 }
 
-const Receptionist = {
-    initializeServer,
-    handleRequest,
-    MediaStreamHandler
-};
+function extractUrlFromXml() {
+    const filePath = path.join(__dirname, 'templates', 'streams.xml');
+    const xmlContent = fs.readFileSync(filePath, 'utf8');
+    xml2js.parseString(xmlContent, (err, result) => {
+        if (err) {
+            console.error('Error parsing XML:', err);
+            return;
+        }
+        const streamUrl = result.Response.Connect[0].Stream[0].$.url;
+        connectedAssistantUrl = new URL(streamUrl).hostname;
+        console.log('Extracted Connected Assistant URL:', connectedAssistantUrl);
+    });
+}
 
-module.exports = Receptionist;
-
-// {{ Add Global Error Handling }}
+// Error handling
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    // Optionally, implement recovery logic or restart mechanisms here
 });
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception thrown:', err);
-    // Optionally, implement recovery logic or graceful shutdown here
-    // process.exit(1); // Uncomment if you choose to exit the process
 });
 
-initializeServer(process.env.OPENAI_ASSISTANT_ID);  // Initialize the server with the OPENAI_ASSISTANT_ID from the .env file
+// Initialize the server
+initializeServer(process.env.OPENAI_ASSISTANT_ID);
+
+module.exports = {
+    initializeServer,
+    MediaStreamHandler
+};

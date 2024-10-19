@@ -10,8 +10,11 @@ COPY package*.json ./
 # Install the dependencies.
 RUN npm install
 
-# Copy the rest of the application code to the working directory.
-COPY . .
+# Copy application code
+COPY Source /app/Source
+
+# Copy public directory
+COPY Source/public /app/Source/public
 
 # Expose the port that your application will run on.
 EXPOSE 3000

@@ -117,7 +117,7 @@ CMD [ "node", "server.js" ]
 
 module.exports = { deployment, sanitizeServiceName, generateRandomString };
 
-// Example usage with async/await
+// // Example usage with async/await
 // (async () => {
 //     try {
 //         const result = await deployment('scripttest', 'clone_asst_sAx8OVokdCzjQ5xXivN2wNmw');

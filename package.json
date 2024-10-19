@@ -18,8 +18,10 @@
   "homepage": "",
   "dependencies": {
     "@google-cloud/run": "^1.4.0",
+    "bcrypt": "^5.1.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-session": "^1.18.1",
     "httpdispatcher": ">=2.1.2",
     "sinon": "^19.0.2"
   },

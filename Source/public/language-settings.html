@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOKO AI Dev Console - Language Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px 0 rgba(255, 0, 0, 0.37);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 600;
+            color: #ff0000;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo span {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        .logo .red {
+            color: #ff0000;
+        }
+        .logo .white {
+            color: #ffffff;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 300;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+        }
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .language-select {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .language-chip {
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: 20px;
+            padding: 5px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .language-chip:hover, .language-chip.selected {
+            background: rgba(255, 0, 0, 0.4);
+            transform: translateY(-2px);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #cc0000;
+            transform: translateY(-2px);
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: #ff0000;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 0;
+            margin-left: 10px;
+        }
+        #errorLog {
+            color: #ff6b6b;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        .search-bar {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+        }
+        .selected-languages {
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #4CAF50; /* Changed from #ff6b6b to a green color */
+        }
+        .update-languages-container {
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        #updateLanguagesBtn {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 16px;
+        }
+        #updateLanguagesBtn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <span class="red">KOKO AI </span> <span class="white">dev console</span>
+        </div>
+        <h1>Language Settings</h1>
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" value="+1 (252) 888-6067" readonly>
+        </div>
+        <div class="form-group">
+            <label for="assistant">Connected Assistant</label>
+            <input type="text" id="assistant" readonly>
+        </div>
+        <div class="form-group">
+            <label>Current Languages <button class="refresh-btn" onclick="getCurrentLanguages()">🔄</button></label>
+            <div id="currentLanguages"></div>
+        </div>
+        <div class="form-group">
+            <label>
+                Select Languages (up to 6)
+                <span class="tooltip">ⓘ
+                    <span class="tooltiptext">Click to see supported languages</span>
+                </span>
+            </label>
+            <input type="text" id="languageSearch" class="search-bar" placeholder="Search languages..." oninput="filterLanguages()">
+            <div class="selected-languages" id="selectedLanguagesDisplay"></div>
+            <div class="update-languages-container">
+                <button id="updateLanguagesBtn" onclick="updateLanguages()" disabled>Update Languages</button>
+            </div>
+            <div id="errorLog"></div>
+            <div class="language-select" id="languageSelect"></div>
+        </div>
+    </div>
+
+    <script>
+        const supportedLanguages = [
+            { code: 'af-ZA', name: 'Afrikaans (South Africa)' },
+            { code: 'sq-AL', name: 'Albanian (Albania)' },
+            { code: 'am-ET', name: 'Amharic (Ethiopia)' },
+            { code: 'ar-DZ', name: 'Arabic (Algeria)' },
+            { code: 'ar-BH', name: 'Arabic (Bahrain)' },
+            { code: 'ar-EG', name: 'Arabic (Egypt)' },
+            { code: 'ar-IQ', name: 'Arabic (Iraq)' },
+            { code: 'ar-IL', name: 'Arabic (Israel)' },
+            { code: 'ar-JO', name: 'Arabic (Jordan)' },
+            { code: 'ar-KW', name: 'Arabic (Kuwait)' },
+            { code: 'ar-LB', name: 'Arabic (Lebanon)' },
+            { code: 'ar-MA', name: 'Arabic (Morocco)' },
+            { code: 'ar-OM', name: 'Arabic (Oman)' },
+            { code: 'ar-QA', name: 'Arabic (Qatar)' },
+            { code: 'ar-SA', name: 'Arabic (Saudi Arabia)' },
+            { code: 'ar-PS', name: 'Arabic (State of Palestine)' },
+            { code: 'ar-TN', name: 'Arabic (Tunisia)' },
+            { code: 'ar-AE', name: 'Arabic (United Arab Emirates)' },
+            { code: 'ar-YE', name: 'Arabic (Yemen)' },
+            { code: 'hy-AM', name: 'Armenian (Armenia)' },
+            { code: 'az-AZ', name: 'Azerbaijani (Azerbaijan)' },
+            { code: 'eu-ES', name: 'Basque (Spain)' },
+            { code: 'bn-BD', name: 'Bengali (Bangladesh)' },
+            { code: 'bn-IN', name: 'Bengali (India)' },
+            { code: 'bs-BA', name: 'Bosnian (Bosnia and Herzegovina)' },
+            { code: 'bg-BG', name: 'Bulgarian (Bulgaria)' },
+            { code: 'my-MM', name: 'Burmese (Myanmar)' },
+            { code: 'ca-ES', name: 'Catalan (Spain)' },
+            { code: 'yue-Hant-HK', name: 'Chinese, Cantonese (Traditional Hong Kong)' },
+            { code: 'zh-CN', name: 'Chinese (Simplified, China)' },
+            { code: 'zh-TW', name: 'Chinese (Traditional, Taiwan)' },
+            { code: 'hr-HR', name: 'Croatian (Croatia)' },
+            { code: 'cs-CZ', name: 'Czech (Czech Republic)' },
+            { code: 'da-DK', name: 'Danish (Denmark)' },
+            { code: 'nl-BE', name: 'Dutch (Belgium)' },
+            { code: 'nl-NL', name: 'Dutch (Netherlands)' },
+            { code: 'en-AU', name: 'English (Australia)' },
+            { code: 'en-CA', name: 'English (Canada)' },
+            { code: 'en-GH', name: 'English (Ghana)' },
+            { code: 'en-HK', name: 'English (Hong Kong)' },
+            { code: 'en-IN', name: 'English (India)' },
+            { code: 'en-IE', name: 'English (Ireland)' },
+            { code: 'en-KE', name: 'English (Kenya)' },
+            { code: 'en-NZ', name: 'English (New Zealand)' },
+            { code: 'en-NG', name: 'English (Nigeria)' },
+            { code: 'en-PK', name: 'English (Pakistan)' },
+            { code: 'en-PH', name: 'English (Philippines)' },
+            { code: 'en-SG', name: 'English (Singapore)' },
+            { code: 'en-ZA', name: 'English (South Africa)' },
+            { code: 'en-TZ', name: 'English (Tanzania)' },
+            { code: 'en-GB', name: 'English (United Kingdom)' },
+            { code: 'en-US', name: 'English (United States)' },
+            { code: 'et-EE', name: 'Estonian (Estonia)' },
+            { code: 'fil-PH', name: 'Filipino (Philippines)' },
+            { code: 'fi-FI', name: 'Finnish (Finland)' },
+            { code: 'fr-BE', name: 'French (Belgium)' },
+            { code: 'fr-CA', name: 'French (Canada)' },
+            { code: 'fr-FR', name: 'French (France)' },
+            { code: 'fr-CH', name: 'French (Switzerland)' },
+            { code: 'gl-ES', name: 'Galician (Spain)' },
+            { code: 'ka-GE', name: 'Georgian (Georgia)' },
+            { code: 'de-AT', name: 'German (Austria)' },
+            { code: 'de-DE', name: 'German (Germany)' },
+            { code: 'de-CH', name: 'German (Switzerland)' },
+            { code: 'el-GR', name: 'Greek (Greece)' },
+            { code: 'gu-IN', name: 'Gujarati (India)' },
+            { code: 'iw-IL', name: 'Hebrew (Israel)' },
+            { code: 'hi-IN', name: 'Hindi (India)' },
+            { code: 'hu-HU', name: 'Hungarian (Hungary)' },
+            { code: 'is-IS', name: 'Icelandic (Iceland)' },
+            { code: 'id-ID', name: 'Indonesian (Indonesia)' },
+            { code: 'it-IT', name: 'Italian (Italy)' },
+            { code: 'it-CH', name: 'Italian (Switzerland)' },
+            { code: 'ja-JP', name: 'Japanese (Japan)' },
+            { code: 'jv-ID', name: 'Javanese (Indonesia)' },
+            { code: 'kn-IN', name: 'Kannada (India)' },
+            { code: 'kk-KZ', name: 'Kazakh (Kazakhstan)' },
+            { code: 'km-KH', name: 'Khmer (Cambodia)' },
+            { code: 'ko-KR', name: 'Korean (South Korea)' },
+            { code: 'lo-LA', name: 'Lao (Laos)' },
+            { code: 'lv-LV', name: 'Latvian (Latvia)' },
+            { code: 'lt-LT', name: 'Lithuanian (Lithuania)' },
+            { code: 'mk-MK', name: 'Macedonian (North Macedonia)' },
+            { code: 'ms-MY', name: 'Malay (Malaysia)' },
+            { code: 'ml-IN', name: 'Malayalam (India)' },
+            { code: 'mr-IN', name: 'Marathi (India)' },
+            { code: 'mn-MN', name: 'Mongolian (Mongolia)' },
+            { code: 'ne-NP', name: 'Nepali (Nepal)' },
+            { code: 'no-NO', name: 'Norwegian Bokmål (Norway)' },
+            { code: 'fa-IR', name: 'Persian (Iran)' },
+            { code: 'pl-PL', name: 'Polish (Poland)' },
+            { code: 'pt-BR', name: 'Portuguese (Brazil)' },
+            { code: 'pt-PT', name: 'Portuguese (Portugal)' },
+            { code: 'pa-Guru-IN', name: 'Punjabi (Gurmukhi India)' },
+            { code: 'ro-RO', name: 'Romanian (Romania)' },
+            { code: 'ru-RU', name: 'Russian (Russia)' },
+            { code: 'sr-RS', name: 'Serbian (Serbia)' },
+            { code: 'si-LK', name: 'Sinhala (Sri Lanka)' },
+            { code: 'sk-SK', name: 'Slovak (Slovakia)' },
+            { code: 'sl-SI', name: 'Slovenian (Slovenia)' },
+            { code: 'es-AR', name: 'Spanish (Argentina)' },
+            { code: 'es-BO', name: 'Spanish (Bolivia)' },
+            { code: 'es-CL', name: 'Spanish (Chile)' },
+            { code: 'es-CO', name: 'Spanish (Colombia)' },
+            { code: 'es-CR', name: 'Spanish (Costa Rica)' },
+            { code: 'es-DO', name: 'Spanish (Dominican Republic)' },
+            { code: 'es-EC', name: 'Spanish (Ecuador)' },
+            { code: 'es-SV', name: 'Spanish (El Salvador)' },
+            { code: 'es-GT', name: 'Spanish (Guatemala)' },
+            { code: 'es-HN', name: 'Spanish (Honduras)' },
+            { code: 'es-MX', name: 'Spanish (Mexico)' },
+            { code: 'es-NI', name: 'Spanish (Nicaragua)' },
+            { code: 'es-PA', name: 'Spanish (Panama)' },
+            { code: 'es-PY', name: 'Spanish (Paraguay)' },
+            { code: 'es-PE', name: 'Spanish (Peru)' },
+            { code: 'es-PR', name: 'Spanish (Puerto Rico)' },
+            { code: 'es-ES', name: 'Spanish (Spain)' },
+            { code: 'es-US', name: 'Spanish (United States)' },
+            { code: 'es-UY', name: 'Spanish (Uruguay)' },
+            { code: 'es-VE', name: 'Spanish (Venezuela)' },
+            { code: 'su-ID', name: 'Sundanese (Indonesia)' },
+            { code: 'sw', name: 'Swahili' },
+            { code: 'sv-SE', name: 'Swedish (Sweden)' },
+            { code: 'ta-IN', name: 'Tamil (India)' },
+            { code: 'ta-MY', name: 'Tamil (Malaysia)' },
+            { code: 'ta-SG', name: 'Tamil (Singapore)' },
+            { code: 'ta-LK', name: 'Tamil (Sri Lanka)' },
+            { code: 'te-IN', name: 'Telugu (India)' },
+            { code: 'th-TH', name: 'Thai (Thailand)' },
+            { code: 'tr-TR', name: 'Turkish (Turkey)' },
+            { code: 'uk-UA', name: 'Ukrainian (Ukraine)' },
+            { code: 'ur-IN', name: 'Urdu (India)' },
+            { code: 'ur-PK', name: 'Urdu (Pakistan)' },
+            { code: 'uz-UZ', name: 'Uzbek (Uzbekistan)' },
+            { code: 'vi-VN', name: 'Vietnamese (Vietnam)' },
+            { code: 'zu-ZA', name: 'Zulu (South Africa)' }
+        ];
+
+        let selectedLanguages = [];
+        let connectedAssistantUrl = '';
+
+        function createLanguageChips() {
+            const languageSelect = document.getElementById('languageSelect');
+            languageSelect.innerHTML = ''; // Clear existing chips
+            supportedLanguages.forEach(lang => {
+                const chip = document.createElement('div');
+                chip.className = 'language-chip';
+                chip.textContent = `${lang.name} (${lang.code})`;
+                chip.onclick = () => toggleLanguage(lang.code, chip);
+                languageSelect.appendChild(chip);
+            });
+        }
+
+        function toggleLanguage(code, chipElement) {
+            const index = selectedLanguages.indexOf(code);
+            if (index > -1) {
+                selectedLanguages.splice(index, 1);
+                chipElement.classList.remove('selected');
+            } else if (selectedLanguages.length < 6) {
+                selectedLanguages.push(code);
+                chipElement.classList.add('selected');
+            }
+            updateSelectedLanguagesDisplay();
+        }
+
+        function updateSelectedLanguagesDisplay() {
+            const display = document.getElementById('selectedLanguagesDisplay');
+            display.textContent = selectedLanguages.map(code => {
+                const lang = supportedLanguages.find(l => l.code === code);
+                return lang ? lang.name : code;
+            }).join(', ');
+            
+            // Enable or disable the update button based on selection
+            const updateButton = document.getElementById('updateLanguagesBtn');
+            updateButton.disabled = selectedLanguages.length === 0;
+        }
+
+        function filterLanguages() {
+            const searchTerm = document.getElementById('languageSearch').value.toLowerCase();
+            const chips = document.querySelectorAll('.language-chip');
+            
+            chips.forEach(chip => {
+                const langText = chip.textContent.toLowerCase();
+                if (searchTerm === '' || langText.includes(searchTerm)) {
+                    chip.style.display = '';
+                } else {
+                    chip.style.display = 'none';
+                }
+            });
+        }
+
+        function updateChipSelection() {
+            const chips = document.querySelectorAll('.language-chip');
+            chips.forEach(chip => {
+                const langCode = chip.textContent.match(/\((.*?)\)/)[1];
+                if (selectedLanguages.includes(langCode)) {
+                    chip.classList.add('selected');
+                } else {
+                    chip.classList.remove('selected');
+                }
+            });
+            updateSelectedLanguagesDisplay();
+        }
+
+        function getCurrentLanguages() {
+            console.log('Fetching current languages...');
+            fetch('/current-languages', {  // Updated URL
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Received current languages:', data);
+                const currentLangsDiv = document.getElementById('currentLanguages');
+                currentLangsDiv.innerHTML = data.languages.map(code => {
+                    const lang = supportedLanguages.find(l => l.code === code);
+                    return lang ? `${lang.name} (${lang.code})` : code;
+                }).join(', ');
+                // Remove this line to prevent auto-selection
+                // selectedLanguages = data.languages;
+                // Instead, clear the selected languages
+                selectedLanguages = [];
+                updateChipSelection();
+                document.getElementById('errorLog').textContent = '';
+            })
+            .catch(error => {
+                console.error('Error fetching current languages:', error);
+                document.getElementById('errorLog').textContent = 'Error fetching current languages. Please try again.';
+            });
+        }
+
+        function updateLanguages() {
+            console.log('Updating languages...');
+            const phone = document.getElementById('phone').value;
+            fetch('/change-languages', {  // Updated URL
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ languages: selectedLanguages, phone: phone, assistant: connectedAssistantUrl }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Languages updated:', data);
+                alert(data.message);
+                getCurrentLanguages();
+                document.getElementById('errorLog').textContent = '';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('errorLog').textContent = 'Failed to update languages. Please try again.';
+            });
+        }
+
+        function getConnectedAssistant() {
+            console.log('Fetching connected assistant URL...');
+            fetch('/connected-assistant')  // Updated URL
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Received connected assistant URL:', data);
+                    connectedAssistantUrl = data.url;
+                    document.getElementById('assistant').value = connectedAssistantUrl;
+                })
+                .catch(error => {
+                    console.error('Error fetching connected assistant URL:', error);
+                    document.getElementById('errorLog').textContent = 'Error fetching connected assistant URL. Please try again.';
+                });
+        }
+
+        document.querySelector('.tooltip').onclick = () => {
+            window.open('https://cloud.google.com/speech-to-text/v2/docs/speech-to-text-supported-languages', '_blank');
+        };
+
+        createLanguageChips();
+        getCurrentLanguages();
+        getConnectedAssistant();
+    </script>
+</body>
+</html>
