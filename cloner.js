@@ -85,4 +85,4 @@ function clone(assistant_id, serviceUrl) {
 module.exports = { clone };
 
 // Remove or comment out the following line to prevent automatic execution
-clone('asst_sAx8OVokdCzjQ5xXivN2wNmw')  // Example usage of the clone function
+// clone('asst_sAx8OVokdCzjQ5xXivN2wNmw')  // Example usage of the clone function
