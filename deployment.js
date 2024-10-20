@@ -3,6 +3,9 @@ const { log } = require('console');
 const path = require('path');
 const fs = require('fs');
 
+const IS_MOCK = process.env.IS_MOCK === 'true';
+const IS_WINDOWS = process.platform === 'win32';
+
 function sanitizeServiceName(name) {
     let sanitized = name.toLowerCase().replace(/[^a-z0-9-]/g, '');
     sanitized = sanitized.replace(/^-+|-+$/g, '');
@@ -13,9 +16,37 @@ function generateRandomString() {
     return Math.random().toString(36).substring(2, 8);
 }
 
-function deployment(serviceName, folder_name, randomSuffix) {
+async function authenticateServiceAccount() {
+    if (IS_MOCK) {
+        console.log('Mock: Authenticating service account');
+        return Promise.resolve('Mock authentication successful');
+    }
+
+    const keyFilePath = path.join(__dirname, 'google_creds.json');
+    const keyFileContent = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
+    const serviceAccountEmail = keyFileContent.client_email;
+
+    const command = `gcloud auth activate-service-account ${serviceAccountEmail} --key-file=${keyFilePath}`;
+
+    try {
+        const result = await executeCommand(command);
+        if (result.output.includes('Activated service account credentials')) {
+            console.log('Service account authenticated successfully');
+            return 'Authentication successful';
+        } else {
+            throw new Error('Unexpected authentication output');
+        }
+    } catch (error) {
+        console.error('Authentication failed:', error);
+        throw error;
+    }
+}
+
+async function deployment(serviceName, folder_name, randomSuffix) {
     serviceName = sanitizeServiceName(serviceName + '-' + randomSuffix);
     log('serviceName:', serviceName);
+
+    const projectId = 'canvas-replica-402316';
 
     let command;
     if (folder_name === null) {
@@ -63,15 +94,32 @@ CMD [ "node", "server.js" ]
 `;
         fs.writeFileSync(path.join(tempDir, 'Dockerfile'), dockerfileContent);
         
-        command = `gcloud run deploy ${serviceName} --source ${tempDir} --region=asia-south1 --allow-unauthenticated`;
+        command = `gcloud run deploy ${serviceName} --source ${tempDir} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
     } else {
-        command = `gcloud run deploy ${serviceName} --source ${folder_name} --region=asia-south1 --allow-unauthenticated`;
+        command = `gcloud run deploy ${serviceName} --source ${folder_name} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
     }
 
     log('Executing command:', command);
 
+    if (IS_MOCK) {
+        return mockDeployment(serviceName);
+    }
+
+    const result = await executeCommand(command, folder_name);
+    
+    // Extract the URL from the deployment output
+    const urlMatch = result.output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
+    const serviceUrl = urlMatch ? urlMatch[1] : null;
+
+    return {
+        ...result,
+        serviceUrl: serviceUrl
+    };
+}
+
+function executeCommand(command, folder_name) {
     return new Promise((resolve, reject) => {
-        const process = spawn('cmd', ['/c', command], { shell: true });
+        const process = IS_WINDOWS ? spawn('cmd', ['/c', command]) : spawn('sh', ['-c', command]);
         let output = '';
 
         process.stdout.on('data', (data) => {
@@ -93,19 +141,11 @@ CMD [ "node", "server.js" ]
                 return;
             }
 
-            const urlMatch = output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
-            const fullServiceNameMatch = output.match(/Service \[([^\]]+)\] revision/);
-
-            if (urlMatch && fullServiceNameMatch) {
-                resolve({ 
-                    success: true, 
-                    serviceUrl: urlMatch[1], 
-                    fullServiceName: fullServiceNameMatch[1],
-                    message: output 
-                });
-            } else {
-                reject({ success: false, message: 'Service URL or full service name not found in the output.', output });
-            }
+            resolve({ 
+                success: true, 
+                output: output,
+                message: 'Deployment successful'
+            });
 
             // Clean up temporary directory if it was created
             if (folder_name === null) {
@@ -115,7 +155,40 @@ CMD [ "node", "server.js" ]
     });
 }
 
-module.exports = { deployment, sanitizeServiceName, generateRandomString };
+function mockDeployment(serviceName) {
+    console.log('Mock: Deploying service', serviceName);
+    return Promise.resolve({
+        success: true,
+        serviceUrl: `https://${serviceName}-mock-url.asia-south1.run.app`,
+        fullServiceName: serviceName,
+        message: 'Mock deployment successful'
+    });
+}
+
+function executeCommand(command) {
+    return new Promise((resolve, reject) => {
+        const process = IS_WINDOWS ? spawn('cmd', ['/c', command]) : spawn('sh', ['-c', command]);
+        let output = '';
+
+        process.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        process.stderr.on('data', (data) => {
+            output += data.toString();
+        });
+
+        process.on('close', (code) => {
+            if (code !== 0) {
+                reject({ success: false, message: `Command failed with code ${code}`, output });
+            } else {
+                resolve({ success: true, output });
+            }
+        });
+    });
+}
+
+module.exports = { deployment, sanitizeServiceName, generateRandomString, authenticateServiceAccount };
 
 // // Example usage with async/await
 // (async () => {

@@ -1,18 +1,30 @@
-FROM node:16
+# Use the Google Cloud SDK image which includes Node.js
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
 
-# Install the Google Cloud SDK
-RUN apt-get update && apt-get install -y curl apt-transport-https ca-certificates gnupg \
-    && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-    | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
-    && apt-get update && apt-get install -y google-cloud-sdk
-
-# Copy the application code
-COPY . /app
+# Set the working directory
 WORKDIR /app
 
+# Copy package.json and package-lock.json (if available)
+COPY package*.json ./
 # Install dependencies
-RUN npm install
+RUN apt-get update && apt-get install -y npm && npm install
+
+# Copy only the necessary files and folders
+COPY main.js .
+COPY cloner.js .
+COPY deployment.js .
+COPY .env .
+COPY google_creds.json .
+COPY Twilio_Number_Routing ./Twilio_Number_Routing
+COPY public ./public
+COPY Source ./Source
+
+# Create the hotel_data directory
+RUN mkdir -p hotel_data && chmod 777 hotel_data
+
+
+# Expose the port the app runs on
+EXPOSE 3000
 
 # Run the application
 CMD ["node", "main.js"]

@@ -1,7 +1,7 @@
 {
-  "name": "create-instance-assistant",
-  "version": "0.0.1",
-  "description": "Create an instance of the Receptionist Assistant",
+  "name": "hotel-ai-receptionist",
+  "version": "1.0.0",
+  "description": "An AI receptionist for hotels using OpenAI API",
   "main": "main.js",
   "scripts": {
     "start": "node main.js"
@@ -10,8 +10,8 @@
     "type": "git",
     "url": ""
   },
-  "author": "",
-  "license": "MIT",
+  "author": "Your Name",
+  "license": "ISC",
   "bugs": {
     "url": ""
   },
@@ -21,11 +21,14 @@
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "express-session": "^1.18.1",
+    "express-session": "^1.18.0",
     "httpdispatcher": ">=2.1.2",
-    "sinon": "^19.0.2"
+    "nodemailer": "^6.9.14",
+    "openai": "^4.55.7",
+    "sinon": "^19.0.2",
+    "twilio": "^5.3.4"
   },
   "engines": {
-    "node": "= 16.x.x"
+    "node": ">=18.0.0"
   }
 }
