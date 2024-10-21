@@ -34,33 +34,29 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
         const { requestId } = await response.json();
         currentRequestId = requestId;
         isDeploymentOngoing = true;
-        connectEventSource(requestId);
+        const eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
+        
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateProgressUI(data);
+            if (data.status === 'completed' || data.error) {
+                eventSource.close();
+                isDeploymentOngoing = false;
+            }
+        };
+        
+        eventSource.onerror = function(error) {
+            console.error('EventSource failed:', error);
+            eventSource.close();
+            if (isDeploymentOngoing) {
+                retrieveFinalData(requestId);
+            }
+        };
     } catch (error) {
         console.error('Fetch error:', error);
         updateProgressUI({ error: 'Failed to send data. Please try again.' });
     }
 });
-
-function connectEventSource(requestId) {
-    const eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
-    
-    eventSource.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        updateProgressUI(data);
-        if (data.status === 'completed' || data.error) {
-            eventSource.close();
-            isDeploymentOngoing = false;
-        }
-    };
-    
-    eventSource.onerror = function(error) {
-        console.error('EventSource failed:', error);
-        eventSource.close();
-        if (isDeploymentOngoing) {
-            setTimeout(() => connectEventSource(requestId), 5000); // Retry connection after 5 seconds
-        }
-    };
-}
 
 async function retrieveFinalData(requestId) {
     while (isDeploymentOngoing) {
@@ -158,13 +154,6 @@ function updateProgressUI(data) {
                     progressSteps.innerHTML += createStepHTML(step, stepStatus, stepProgress);
                 }
             });
-        }
-    }
-
-    if (data.status === 'Deployment') {
-        const deploymentStep = progressSteps.querySelector('.progress-step:nth-child(5)');
-        if (deploymentStep) {
-            updateStepProgress(deploymentStep, 'active', data.progress);
         }
     }
 }
@@ -547,18 +536,3 @@ function retryCreation() {
     showStep(1);
 }
 
-// Add this function to handle page unload
-window.addEventListener('beforeunload', function (e) {
-    if (isDeploymentOngoing) {
-        const message = 'Deployment is still in progress. Are you sure you want to leave?';
-        e.returnValue = message;
-        return message;
-    }
-});
-
-// Add this function to handle page load
-window.addEventListener('load', function () {
-    if (currentRequestId) {
-        connectEventSource(currentRequestId);
-    }
-});

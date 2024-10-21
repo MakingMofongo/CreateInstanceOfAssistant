@@ -268,23 +268,40 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
     })();
 
     const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment', 'Phone Configuration'];
-    const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000, 2000] : [10000, 20000, 30000, 20000, 300000, 10000];
-    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000)));
+    const baseTimings = [10000, 20000, 30000, 20000, 300000, 10000];
+    const adjustedDurations = baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000)));
 
     for (let i = 0; i < steps.length; i++) {
       sendUpdate({ status: steps[i], progress: 0 });
       try {
         if (i === steps.length - 2) { // Deployment step
-          sendUpdate({ status: 'Deployment', progress: 0 });
-          await deploymentPromise;
+          const simulateDeploymentProgress = async () => {
+            for (let progress = 0; progress <= 100; progress += 5) {
+              await new Promise(resolve => setTimeout(resolve, adjustedDurations[i] / 20));
+              sendUpdate({ status: 'Deployment', progress });
+            }
+          };
+
+          // Start the faux progress simulation
+          const fauxProgressPromise = simulateDeploymentProgress();
+
+          // Wait for the actual deployment to complete, without a timeout
+          const deploymentResult = await deploymentPromise;
+
+          // If deployment completes before faux progress, stop the faux progress
+          fauxProgressPromise.then(() => {
+            sendUpdate({ status: 'Deployment', progress: 100 });
+          });
+
+          // Deployment completed successfully
           sendUpdate({ status: 'Deployment', progress: 100 });
         } else {
           await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
         }
       } catch (error) {
         console.error(`Error in ${steps[i]} step:`, error);
-        sendUpdate({ error: `Error during ${steps[i]}: ${error.message}` });
-        return;
+        sendUpdate({ error: `An error occurred during the ${steps[i]} step. Please try again.` });
+        return; // Exit the function early
       }
     }
 
