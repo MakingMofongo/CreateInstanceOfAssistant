@@ -21,7 +21,7 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
     try {
         const response = await fetch('/create-bot', {
             method: 'POST',
-            body: formData, // Use FormData instead of JSON
+            body: formData,
         });
         
         if (!response.ok) {
@@ -34,16 +34,19 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
         eventSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             updateProgressUI(data);
+            if (data.status === 'end' || data.error) {
+                eventSource.close();
+            }
         };
         
         eventSource.onerror = function(error) {
             console.error('EventSource failed:', error);
-            document.getElementById('progress-steps').innerHTML = '<div class="error-message">Error: Connection lost. Please try again.</div>';
+            updateProgressUI({ error: 'Connection lost. Please try again.' });
             eventSource.close();
         };
     } catch (error) {
         console.error('Fetch error:', error);
-        document.getElementById('progress-steps').innerHTML = '<div class="error-message">Error: Failed to send data. Please try again.</div>';
+        updateProgressUI({ error: 'Failed to send data. Please try again.' });
     }
 });
 
@@ -55,7 +58,7 @@ function updateProgressUI(data) {
         { title: 'Creating Knowledge Base', description: 'Building hotel information database', time: '~20 sec' },
         { title: 'Training AI', description: 'Teaching your AI about your hotel', time: '~30 sec' },
         { title: 'Cloud Setup', description: 'Preparing cloud infrastructure', time: '~20 sec' },
-        { title: 'Deployment', description: 'Launching your AI receptionist', time: '~200 sec' },
+        { title: 'Deployment', description: 'Launching your AI receptionist', time: '~5 min' },
         { title: 'Phone Configuration', description: 'Setting up your phone number', time: '~10 sec' }
     ];
 
@@ -93,7 +96,16 @@ function updateProgressUI(data) {
         showStep(3);
         celebrate();
     } else if (data.error) {
-        progressSteps.innerHTML += `<div class="progress-step error">❌ Error: ${data.error}</div>`;
+        progressSteps.innerHTML += `
+            <div class="progress-step error">
+                <div class="progress-step-header">
+                    <div class="progress-step-icon">❌</div>
+                    <div class="progress-step-title">Error</div>
+                </div>
+                <div class="progress-step-description">${data.error}</div>
+            </div>
+        `;
+        showErrorMessage(data.error);
     } else if (data.status !== 'end' && data.status !== 'Connected') {
         const currentStep = steps.findIndex(step => step.title.toLowerCase() === data.status.toLowerCase());
         if (currentStep !== -1) {
@@ -468,3 +480,21 @@ document.addEventListener('DOMContentLoaded', () => {
     setupRevealButton();
     document.getElementById('changeHiltonUrl').addEventListener('click', changeHiltonUrl);
 });
+
+// Add this new function to handle errors
+function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <p>${message}</p>
+        <button onclick="retryCreation()">Try Again</button>
+    `;
+    document.getElementById('step2-content').appendChild(errorDiv);
+}
+
+// Add this new function to retry the creation process
+function retryCreation() {
+    document.querySelector('.error-message').remove();
+    document.getElementById('progress-steps').innerHTML = '';
+    showStep(1);
+}

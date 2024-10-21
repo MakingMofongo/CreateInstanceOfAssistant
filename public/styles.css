@@ -893,3 +893,27 @@ footer {
     box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
 
+.error-message {
+    background-color: rgba(255, 0, 0, 0.1);
+    border: 1px solid #ff0000;
+    color: #ff0000;
+    padding: 1rem;
+    margin-top: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.error-message button {
+    background-color: #ff0000;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.error-message button:hover {
+    background-color: #cc0000;
+}

@@ -254,27 +254,30 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
       return { clonedServiceResult, assistant, username: cloneResult.username, password: cloneResult.password };
     })();
 
-    const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment'];
-    const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000] : [0.1, 0.2, 0.3, 0.2, 0.2];
-    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * lastDeploymentTime));
+    const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment', 'Phone Configuration'];
+    const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000, 2000] : [10000, 20000, 30000, 20000, 300000, 10000]; // Increased timeout for deployment to 5 minutes
+    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000))); // Adjust based on last deployment time
 
-    // Simulate progress for all steps
     for (let i = 0; i < steps.length; i++) {
-      if (i === steps.length - 1) {
-        // For the deployment step, we'll wait for actual completion
-        sendUpdate({ status: 'Deployment', progress: 0 });
-        const deploymentResult = await Promise.race([
-          deploymentPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Deployment timeout')), adjustedDurations[i]))
-        ]);
-
-        if (deploymentResult) {
-          sendUpdate({ status: 'Deployment', progress: 100 });
+      sendUpdate({ status: steps[i], progress: 0 });
+      try {
+        if (i === steps.length - 2) { // Deployment step
+          const deploymentResult = await Promise.race([
+            deploymentPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Deployment timeout')), adjustedDurations[i]))
+          ]);
+          if (deploymentResult) {
+            sendUpdate({ status: steps[i], progress: 100 });
+          }
         } else {
-          throw new Error('Deployment failed or timed out');
+          await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
         }
-      } else {
-        await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
+      } catch (error) {
+        if (error.message === 'Deployment timeout') {
+          sendUpdate({ error: 'Deployment timed out. Please try again later.' });
+          return; // Exit the function early
+        }
+        throw error; // Rethrow other errors
       }
     }
 
