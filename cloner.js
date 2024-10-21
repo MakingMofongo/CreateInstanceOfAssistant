@@ -65,8 +65,16 @@ function clone(assistant_id, serviceUrl) {
     const envFilePath = path.join(__dirname, newFolderName, '.env');
     let envFileContent = fs.readFileSync(envFilePath, 'utf8');
     envFileContent = envFileContent.replace(/OPENAI_ASSISTANT_ID=.+/g, `OPENAI_ASSISTANT_ID=${assistant_id}`);
+    
+    // Ensure the LANGUAGES variable is set to English only
+    if (envFileContent.includes('LANGUAGES=')) {
+        envFileContent = envFileContent.replace(/LANGUAGES=.+/, 'LANGUAGES=en-US');
+    } else {
+        envFileContent += '\nLANGUAGES=en-US';
+    }
+
     fs.writeFileSync(envFilePath, envFileContent, { flag: 'w' });
-    console.log('.env file updated');
+    console.log('.env file updated with English as the default language');
 
     return { folderName: newFolderName, username, password };
 }

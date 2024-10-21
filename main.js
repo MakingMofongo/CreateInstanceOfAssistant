@@ -114,6 +114,19 @@ function startServer() {
     });
   });
 
+  app.post('/change-hilton-url', async (req, res) => {
+    const hiltonUrl = 'https://asstsax8ovokdczjq5xxivn2wnmw-6qwubf-316685833651.asia-south1.run.app/twiml';
+    try {
+        console.log("Attempting to change Hilton URL");
+        const result = await updatePhoneNumber(hiltonUrl);
+        console.log("URL change result:", result);
+        res.json({ success: true, message: 'URL changed successfully', result });
+    } catch (error) {
+        console.error('Error changing Hilton URL:', error);
+        res.status(500).json({ success: false, message: 'Failed to change URL', error: error.message });
+    }
+  });
+
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`Server is running on port ${port}`));
 }
@@ -324,5 +337,3 @@ async function parseUploadedFile(filePath) {
     });
   });
 }
-
-
