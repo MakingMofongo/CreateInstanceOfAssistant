@@ -66,6 +66,10 @@ function clone(assistant_id, serviceUrl) {
     let envFileContent = fs.readFileSync(envFilePath, 'utf8');
     envFileContent = envFileContent.replace(/OPENAI_ASSISTANT_ID=.+/g, `OPENAI_ASSISTANT_ID=${assistant_id}`);
     
+    // Update DEV_CONSOLE_USERNAME and DEV_CONSOLE_PASSWORD
+    envFileContent = envFileContent.replace(/DEV_CONSOLE_USERNAME=.+/g, `DEV_CONSOLE_USERNAME=${username}`);
+    envFileContent = envFileContent.replace(/DEV_CONSOLE_PASSWORD=.+/g, `DEV_CONSOLE_PASSWORD=${password}`);
+    
     // Ensure the LANGUAGES variable is set to English only
     if (envFileContent.includes('LANGUAGES=')) {
         envFileContent = envFileContent.replace(/LANGUAGES=.+/, 'LANGUAGES=en-US');
@@ -74,7 +78,7 @@ function clone(assistant_id, serviceUrl) {
     }
 
     fs.writeFileSync(envFilePath, envFileContent, { flag: 'w' });
-    console.log('.env file updated with English as the default language');
+    console.log('.env file updated with new assistant ID, credentials, and English as the default language');
 
     return { folderName: newFolderName, username, password };
 }
