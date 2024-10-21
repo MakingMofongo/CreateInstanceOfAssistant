@@ -231,10 +231,13 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
 
       const randomSuffix = generateRandomString();
       
-      const emptyServiceResult = await deployment(serviceName, null, randomSuffix);
+      // Use the assistant.id for the actual deployment
+      const deploymentName = IS_MOCK ? `tester-${randomSuffix}` : `${assistant.id}-${randomSuffix}`;
+      
+      const emptyServiceResult = await deployment(deploymentName, null, randomSuffix);
       if (!emptyServiceResult.serviceUrl) throw new Error('Failed to obtain service URL from empty deployment');
       const cloneResult = clone(assistant.id, emptyServiceResult.serviceUrl);
-      const clonedServiceResult = await deployment(serviceName, cloneResult.folderName, randomSuffix);
+      const clonedServiceResult = await deployment(deploymentName, cloneResult.folderName, randomSuffix);
       if (!clonedServiceResult.serviceUrl) throw new Error('Failed to obtain service URL from cloned deployment');
       return { clonedServiceResult, assistant, username: cloneResult.username, password: cloneResult.password };
     })();
@@ -321,3 +324,4 @@ async function parseUploadedFile(filePath) {
     });
   });
 }
+
