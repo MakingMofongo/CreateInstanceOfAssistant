@@ -203,7 +203,13 @@ function generateKnowledgeBaseContent(data, botType, additionalInfo) {
 async function processBotCreation(requestId, { serviceName, name, formData, finalPrompt, additionalInfo, botType }) {
   const sendUpdate = (data) => {
     const progress = botCreationProgress.get(requestId);
-    if (progress && progress.sendUpdate) progress.sendUpdate(data);
+    if (progress && progress.sendUpdate) {
+      try {
+        progress.sendUpdate(data);
+      } catch (error) {
+        console.error('Error sending update:', error);
+      }
+    }
   };
 
   try {
@@ -269,9 +275,21 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
       sendUpdate({ status: steps[i], progress: 0 });
       try {
         if (i === steps.length - 2) { // Deployment step
+          const deploymentTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Deployment timeout')), adjustedDurations[i])
+          );
+
+          // Simulate progress for deployment step
+          const simulateDeploymentProgress = async () => {
+            for (let progress = 0; progress <= 100; progress += 5) {
+              await new Promise(resolve => setTimeout(resolve, adjustedDurations[i] / 20));
+              sendUpdate({ status: 'Deployment', progress });
+            }
+          };
+
           await Promise.race([
-            deploymentPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Deployment timeout')), adjustedDurations[i]))
+            Promise.all([deploymentPromise, simulateDeploymentProgress()]),
+            deploymentTimeout
           ]);
         } else {
           await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
@@ -299,10 +317,16 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
     const { clonedServiceResult, assistant, username: deployedUsername, password: deployedPassword } = await deploymentPromise;
 
     sendUpdate({ status: 'Phone Configuration', progress: 0 });
-    const phoneNumberInfo = await updatePhoneNumber(clonedServiceResult.serviceUrl);
-    await simulateProgress(sendUpdate, 'Phone Configuration', IS_MOCK ? 2000 : 10000);
+    let phoneNumberInfo;
+    try {
+      phoneNumberInfo = await updatePhoneNumber(clonedServiceResult.serviceUrl);
+      await simulateProgress(sendUpdate, 'Phone Configuration', IS_MOCK ? 2000 : 10000);
+    } catch (error) {
+      console.error('Error in phone configuration:', error);
+      phoneNumberInfo = { phoneNumber: 'Configuration failed. Please contact support.' };
+    }
 
-    sendUpdate({
+    const finalData = {
       status: 'completed',
       message: 'Your AI receptionist is ready!',
       assistantId: assistant.id,
@@ -310,14 +334,29 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
       serviceUrl: clonedServiceResult.serviceUrl,
       username: deployedUsername,
       password: deployedPassword
-    });
+    };
+
+    // Attempt to send the final update multiple times
+    for (let i = 0; i < 3; i++) {
+      try {
+        sendUpdate(finalData);
+        break; // If successful, exit the loop
+      } catch (error) {
+        console.error(`Attempt ${i + 1} to send final update failed:`, error);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+      }
+    }
+
+    // Store the final data in case the client needs to retrieve it later
+    botCreationProgress.set(requestId, { ...botCreationProgress.get(requestId), finalData });
 
   } catch (error) {
     console.error('Error in processBotCreation:', error);
-    sendUpdate({ error: 'An error occurred while creating your AI receptionist. Please try again.' });
+    sendUpdate({ error: 'An error occurred while creating your AI receptionist. Please try again or contact support.' });
   } finally {
     sendUpdate({ status: 'end' });
-    botCreationProgress.delete(requestId);
+    // Keep the finalData in botCreationProgress for a while, in case the client needs to retrieve it
+    setTimeout(() => botCreationProgress.delete(requestId), 300000); // Remove after 5 minutes
   }
 }
 
@@ -350,3 +389,14 @@ async function parseUploadedFile(filePath) {
     });
   });
 }
+
+// Add a new endpoint to retrieve the final data if the client lost connection
+app.get('/retrieve-bot-data', (req, res) => {
+  const requestId = req.query.requestId;
+  const botData = botCreationProgress.get(requestId);
+  if (botData && botData.finalData) {
+    res.json(botData.finalData);
+  } else {
+    res.status(404).json({ error: 'Bot data not found or not ready yet' });
+  }
+});

@@ -1,4 +1,6 @@
 // Form Submission Handler
+let currentRequestId = null;
+
 document.getElementById('createBotForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -29,6 +31,7 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
         }
         
         const { requestId } = await response.json();
+        currentRequestId = requestId;
         const eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
         
         eventSource.onmessage = function(event) {
@@ -36,19 +39,39 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
             updateProgressUI(data);
             if (data.status === 'end' || data.error) {
                 eventSource.close();
+                if (data.status === 'end' && !data.error) {
+                    retrieveFinalData(requestId);
+                }
             }
         };
         
         eventSource.onerror = function(error) {
             console.error('EventSource failed:', error);
-            updateProgressUI({ error: 'Connection lost. Please try again.' });
             eventSource.close();
+            retrieveFinalData(requestId);
         };
     } catch (error) {
         console.error('Fetch error:', error);
         updateProgressUI({ error: 'Failed to send data. Please try again.' });
     }
 });
+
+async function retrieveFinalData(requestId) {
+    for (let i = 0; i < 3; i++) {
+        try {
+            const response = await fetch(`/retrieve-bot-data?requestId=${requestId}`);
+            if (response.ok) {
+                const data = await response.json();
+                updateProgressUI(data);
+                return;
+            }
+        } catch (error) {
+            console.error(`Attempt ${i + 1} to retrieve final data failed:`, error);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
+    }
+    updateProgressUI({ error: 'Failed to retrieve final data. Please contact support with your request ID.' });
+}
 
 // Update Progress UI
 function updateProgressUI(data) {
@@ -95,6 +118,9 @@ function updateProgressUI(data) {
         
         showStep(3);
         celebrate();
+        
+        document.getElementById('completion-details').innerHTML += `
+            <p>If you lose this information, you can retrieve it later using your request ID: ${currentRequestId}</p>`;
     } else if (data.error) {
         const errorStep = progressSteps.querySelector('.progress-step.error') || document.createElement('div');
         errorStep.className = 'progress-step error';
@@ -503,3 +529,4 @@ function retryCreation() {
     document.getElementById('progress-steps').innerHTML = '';
     showStep(1);
 }
+
