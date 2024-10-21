@@ -1,5 +1,6 @@
 // Form Submission Handler
 let currentRequestId = null;
+let isDeploymentOngoing = false;
 
 document.getElementById('createBotForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -32,23 +33,24 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
         
         const { requestId } = await response.json();
         currentRequestId = requestId;
+        isDeploymentOngoing = true;
         const eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
         
         eventSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             updateProgressUI(data);
-            if (data.status === 'end' || data.error) {
+            if (data.status === 'completed' || data.error) {
                 eventSource.close();
-                if (data.status === 'end' && !data.error) {
-                    retrieveFinalData(requestId);
-                }
+                isDeploymentOngoing = false;
             }
         };
         
         eventSource.onerror = function(error) {
             console.error('EventSource failed:', error);
             eventSource.close();
-            retrieveFinalData(requestId);
+            if (isDeploymentOngoing) {
+                retrieveFinalData(requestId);
+            }
         };
     } catch (error) {
         console.error('Fetch error:', error);
@@ -57,20 +59,22 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
 });
 
 async function retrieveFinalData(requestId) {
-    for (let i = 0; i < 3; i++) {
+    while (isDeploymentOngoing) {
         try {
             const response = await fetch(`/retrieve-bot-data?requestId=${requestId}`);
             if (response.ok) {
                 const data = await response.json();
                 updateProgressUI(data);
-                return;
+                if (data.status === 'completed' || data.error) {
+                    isDeploymentOngoing = false;
+                    return;
+                }
             }
         } catch (error) {
-            console.error(`Attempt ${i + 1} to retrieve final data failed:`, error);
+            console.error('Failed to retrieve final data:', error);
         }
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retrying
     }
-    updateProgressUI({ error: 'Failed to retrieve final data. Please contact support with your request ID.' });
 }
 
 // Update Progress UI
@@ -81,11 +85,12 @@ function updateProgressUI(data) {
         { title: 'Creating Knowledge Base', description: 'Building hotel information database', time: '~20 sec' },
         { title: 'Training AI', description: 'Teaching your AI about your hotel', time: '~30 sec' },
         { title: 'Cloud Setup', description: 'Preparing cloud infrastructure', time: '~20 sec' },
-        { title: 'Deployment', description: 'Launching your AI receptionist', time: '~5 min' },
+        { title: 'Deployment', description: 'Launching your AI receptionist', time: 'Variable' },
         { title: 'Phone Configuration', description: 'Setting up your phone number', time: '~10 sec' }
     ];
 
     if (data.status === 'completed') {
+        isDeploymentOngoing = false;
         steps.forEach((step, index) => {
             updateStepProgress(progressSteps.querySelector(`.progress-step:nth-child(${index + 1})`), 'completed', 100);
         });
@@ -122,6 +127,7 @@ function updateProgressUI(data) {
         document.getElementById('completion-details').innerHTML += `
             <p>If you lose this information, you can retrieve it later using your request ID: ${currentRequestId}</p>`;
     } else if (data.error) {
+        isDeploymentOngoing = false;
         const errorStep = progressSteps.querySelector('.progress-step.error') || document.createElement('div');
         errorStep.className = 'progress-step error';
         errorStep.innerHTML = `
