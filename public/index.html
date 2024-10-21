@@ -26,15 +26,16 @@
             margin: 0;
             padding: 0;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-direction: column;
             min-height: 100vh;
             overflow-x: hidden;
         }
 
         .container {
-            max-width: 800px;
+            flex: 1;
             width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
             padding: 2rem;
             box-sizing: border-box;
         }
@@ -633,6 +634,101 @@
             color: var(--text-color);
             padding: 60px 0;
         }
+
+        .country-select-container {
+            position: relative;
+        }
+
+        .country-select-container input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--secondary-color);
+            background-color: rgba(0, 0, 0, 0.1);
+            color: var(--text-color);
+            font-size: 1rem;
+        }
+
+        .country-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: var(--surface-color);
+            border: 1px solid var(--secondary-color);
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            z-index: 10;
+            display: none;
+        }
+
+        .country-option {
+            padding: 0.5rem;
+            cursor: pointer;
+        }
+
+        .country-option:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        footer {
+            background-color: var(--surface-color);
+            color: var(--text-color);
+            padding: 2rem 0;
+            width: 100%;
+        }
+
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 0 2rem;
+            box-sizing: border-box;
+        }
+
+        .footer-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--text-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--primary-color);
+        }
+
+        .footer-copyright {
+            width: 100%;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                margin-top: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -682,13 +778,10 @@
                         
                         <div class="form-group">
                             <label for="hotelCountry" class="required-field">Country</label>
-                            <select id="hotelCountry" name="country" required>
-                                <option value="" disabled selected>Select your country</option>
-                                <option value="US">United States</option>
-                                <option value="CA">Canada</option>
-                                <option value="UK">United Kingdom</option>
-                                <!-- Add more countries as needed -->
-                            </select>
+                            <div class="country-select-container">
+                                <input type="text" id="hotelCountry" name="country" required placeholder="Search for a country">
+                                <div class="country-options" id="hotelCountryOptions"></div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -747,13 +840,10 @@
                         
                         <div class="form-group">
                             <label for="hospitalCountry" class="required-field">Country</label>
-                            <select id="hospitalCountry" name="country" required>
-                                <option value="" disabled selected>Select your country</option>
-                                <option value="US">United States</option>
-                                <option value="CA">Canada</option>
-                                <option value="UK">United Kingdom</option>
-                                <!-- Add more countries as needed -->
-                            </select>
+                            <div class="country-select-container">
+                                <input type="text" id="hospitalCountry" name="country" required placeholder="Search for a country">
+                                <div class="country-options" id="hospitalCountryOptions"></div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -811,13 +901,10 @@
                         
                         <div class="form-group">
                             <label for="customCountry" class="required-field">Country</label>
-                            <select id="customCountry" name="country" required>
-                                <option value="" disabled selected>Select your country</option>
-                                <option value="US">United States</option>
-                                <option value="CA">Canada</option>
-                                <option value="UK">United Kingdom</option>
-                                <!-- Add more countries as needed -->
-                            </select>
+                            <div class="country-select-container">
+                                <input type="text" id="customCountry" name="country" required placeholder="Search for a country">
+                                <div class="country-options" id="customCountryOptions"></div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -894,7 +981,25 @@
 
     <div class="celebration" id="celebration"></div>
 
-    <!-- Add this just before the closing </body> tag -->
+    <!-- Add this footer just before the closing </body> tag -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">
+                <span style="color: var(--primary-color);">KOKO</span>AI
+            </div>
+            <div class="footer-links">
+                <a href="#">About</a>
+                <a href="#">Contact</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            © 2024 KOKOAI. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- Keep the persistent prompt div here -->
     <div id="persistentPrompt" style="position: fixed; bottom: 0; left: 0; right: 0; background-color: rgba(0, 0, 0, 0.8); color: white; transition: all 0.3s ease; transform: translateY(calc(100% - 40px));">
         <div id="promptHeader" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; cursor: pointer;">
             <h4 style="margin: 0;">Live Prompt Preview</h4>
@@ -1270,6 +1375,65 @@ Start by introducing yourself and asking how you can help today.`;
 
         // Initial update of the persistent prompt
         updateLivePrompt();
+
+        // Load countries and set up country selection
+        fetch('countries.json')
+            .then(response => response.json())
+            .then(countries => {
+                setupCountrySelect('hotelCountry', countries);
+                setupCountrySelect('hospitalCountry', countries);
+                setupCountrySelect('customCountry', countries);
+            });
+
+        function setupCountrySelect(inputId, countries) {
+            const input = document.getElementById(inputId);
+            const optionsContainer = document.getElementById(inputId + 'Options');
+
+            input.addEventListener('input', () => {
+                const value = input.value.toLowerCase();
+                const filteredCountries = countries.filter(country => 
+                    country.name.toLowerCase().includes(value)
+                );
+                
+                optionsContainer.innerHTML = '';
+                filteredCountries.forEach(country => {
+                    const option = document.createElement('div');
+                    option.classList.add('country-option');
+                    option.textContent = country.name;
+                    option.addEventListener('click', () => {
+                        input.value = country.name;
+                        optionsContainer.style.display = 'none';
+                    });
+                    optionsContainer.appendChild(option);
+                });
+
+                optionsContainer.style.display = filteredCountries.length > 0 ? 'block' : 'none';
+            });
+
+            input.addEventListener('focus', () => {
+                if (input.value === '') {
+                    const allCountries = countries.slice(0, 10); // Show first 10 countries
+                    optionsContainer.innerHTML = '';
+                    allCountries.forEach(country => {
+                        const option = document.createElement('div');
+                        option.classList.add('country-option');
+                        option.textContent = country.name;
+                        option.addEventListener('click', () => {
+                            input.value = country.name;
+                            optionsContainer.style.display = 'none';
+                        });
+                        optionsContainer.appendChild(option);
+                    });
+                    optionsContainer.style.display = 'block';
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !optionsContainer.contains(e.target)) {
+                    optionsContainer.style.display = 'none';
+                }
+            });
+        }
     </script>
 </body>
 </html>
