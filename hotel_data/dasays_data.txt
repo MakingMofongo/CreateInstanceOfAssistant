@@ -1,0 +1,9 @@
+Hotel Name: Dasays
+Email: rasheed3086@gmail.com,,
+Country: Algeria,,
+Star Rating: 4
+Number of Rooms: 23
+Amenities: pool,spa restraunt
+Description: cost effective
+Policies: respect
+Location: centauri
