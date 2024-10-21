@@ -269,15 +269,22 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
 
     const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment', 'Phone Configuration'];
     const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000, 2000] : [10000, 20000, 30000, 20000, 300000, 10000];
+    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000)));
 
     for (let i = 0; i < steps.length; i++) {
       sendUpdate({ status: steps[i], progress: 0 });
-      if (i === steps.length - 2) { // Deployment step
-        sendUpdate({ status: 'Deployment', progress: 0 });
-        await deploymentPromise;
-        sendUpdate({ status: 'Deployment', progress: 100 });
-      } else {
-        await simulateProgress(sendUpdate, steps[i], IS_MOCK ? baseTimings[i] : 0);
+      try {
+        if (i === steps.length - 2) { // Deployment step
+          sendUpdate({ status: 'Deployment', progress: 0 });
+          await deploymentPromise;
+          sendUpdate({ status: 'Deployment', progress: 100 });
+        } else {
+          await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
+        }
+      } catch (error) {
+        console.error(`Error in ${steps[i]} step:`, error);
+        sendUpdate({ error: `Error during ${steps[i]}: ${error.message}` });
+        return;
       }
     }
 
