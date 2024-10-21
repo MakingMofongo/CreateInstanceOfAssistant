@@ -246,38 +246,49 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
       // Use the assistant.id for the actual deployment
       const deploymentName = IS_MOCK ? `tester-${randomSuffix}` : `${assistant.id}-${randomSuffix}`;
       
+      sendUpdate({ status: 'Deployment', progress: 10 });
       const emptyServiceResult = await deployment(deploymentName, null, randomSuffix);
       if (!emptyServiceResult.serviceUrl) throw new Error('Failed to obtain service URL from empty deployment');
+      
+      sendUpdate({ status: 'Deployment', progress: 40 });
       const cloneResult = clone(assistant.id, emptyServiceResult.serviceUrl);
+      
+      sendUpdate({ status: 'Deployment', progress: 70 });
       const clonedServiceResult = await deployment(deploymentName, cloneResult.folderName, randomSuffix);
       if (!clonedServiceResult.serviceUrl) throw new Error('Failed to obtain service URL from cloned deployment');
+      
+      sendUpdate({ status: 'Deployment', progress: 100 });
       return { clonedServiceResult, assistant, username: cloneResult.username, password: cloneResult.password };
     })();
 
     const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment', 'Phone Configuration'];
-    const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000, 2000] : [10000, 20000, 30000, 20000, 300000, 10000]; // Increased timeout for deployment to 5 minutes
-    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000))); // Adjust based on last deployment time
+    const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000, 2000] : [10000, 20000, 30000, 20000, 300000, 10000];
+    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000)));
 
     for (let i = 0; i < steps.length; i++) {
       sendUpdate({ status: steps[i], progress: 0 });
       try {
         if (i === steps.length - 2) { // Deployment step
-          const deploymentResult = await Promise.race([
+          await Promise.race([
             deploymentPromise,
             new Promise((_, reject) => setTimeout(() => reject(new Error('Deployment timeout')), adjustedDurations[i]))
           ]);
-          if (deploymentResult) {
-            sendUpdate({ status: steps[i], progress: 100 });
-          }
         } else {
           await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
         }
       } catch (error) {
         if (error.message === 'Deployment timeout') {
-          sendUpdate({ error: 'Deployment timed out. Please try again later.' });
-          return; // Exit the function early
+          sendUpdate({ error: 'Deployment is taking longer than expected. Please check back later.' });
+          // Continue with deployment in the background
+          deploymentPromise.then(() => {
+            sendUpdate({ status: 'completed', message: 'Your AI receptionist is ready!' });
+          }).catch((err) => {
+            console.error('Background deployment failed:', err);
+            sendUpdate({ error: 'Deployment failed. Please try again.' });
+          });
+          return;
         }
-        throw error; // Rethrow other errors
+        throw error;
       }
     }
 

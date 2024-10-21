@@ -96,15 +96,18 @@ function updateProgressUI(data) {
         showStep(3);
         celebrate();
     } else if (data.error) {
-        progressSteps.innerHTML += `
-            <div class="progress-step error">
-                <div class="progress-step-header">
-                    <div class="progress-step-icon">❌</div>
-                    <div class="progress-step-title">Error</div>
-                </div>
-                <div class="progress-step-description">${data.error}</div>
+        const errorStep = progressSteps.querySelector('.progress-step.error') || document.createElement('div');
+        errorStep.className = 'progress-step error';
+        errorStep.innerHTML = `
+            <div class="progress-step-header">
+                <div class="progress-step-icon">❌</div>
+                <div class="progress-step-title">Error</div>
             </div>
+            <div class="progress-step-description">${data.error}</div>
         `;
+        if (!progressSteps.contains(errorStep)) {
+            progressSteps.appendChild(errorStep);
+        }
         showErrorMessage(data.error);
     } else if (data.status !== 'end' && data.status !== 'Connected') {
         const currentStep = steps.findIndex(step => step.title.toLowerCase() === data.status.toLowerCase());
@@ -487,7 +490,9 @@ function showErrorMessage(message) {
     errorDiv.className = 'error-message';
     errorDiv.innerHTML = `
         <p>${message}</p>
-        <button onclick="retryCreation()">Try Again</button>
+        ${message.includes('taking longer than expected') ? 
+            '<p>You can close this page and check back later using the provided URL.</p>' :
+            '<button onclick="retryCreation()">Try Again</button>'}
     `;
     document.getElementById('step2-content').appendChild(errorDiv);
 }
