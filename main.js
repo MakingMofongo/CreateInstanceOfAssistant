@@ -117,9 +117,8 @@ function startServer() {
   app.post('/change-hilton-url', async (req, res) => {
     const hiltonUrl = 'https://asstsax8ovokdczjq5xxivn2wnmw-6qwubf-316685833651.asia-south1.run.app/twiml';
     try {
-        console.log("Attempting to change Hilton URL");
         const result = await updatePhoneNumber(hiltonUrl);
-        console.log("URL change result:", result);
+        console.log("Phone number update result:", result);
         res.json({ success: true, message: 'URL changed successfully', result });
     } catch (error) {
         console.error('Error changing Hilton URL:', error);
