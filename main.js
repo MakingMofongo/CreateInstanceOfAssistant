@@ -269,44 +269,15 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
 
     const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment', 'Phone Configuration'];
     const baseTimings = IS_MOCK ? [2000, 2000, 2000, 2000, 2000, 2000] : [10000, 20000, 30000, 20000, 300000, 10000];
-    const adjustedDurations = IS_MOCK ? baseTimings : baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000)));
 
     for (let i = 0; i < steps.length; i++) {
       sendUpdate({ status: steps[i], progress: 0 });
-      try {
-        if (i === steps.length - 2) { // Deployment step
-          const deploymentTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Deployment timeout')), adjustedDurations[i])
-          );
-
-          // Simulate progress for deployment step
-          const simulateDeploymentProgress = async () => {
-            for (let progress = 0; progress <= 100; progress += 5) {
-              await new Promise(resolve => setTimeout(resolve, adjustedDurations[i] / 20));
-              sendUpdate({ status: 'Deployment', progress });
-            }
-          };
-
-          await Promise.race([
-            Promise.all([deploymentPromise, simulateDeploymentProgress()]),
-            deploymentTimeout
-          ]);
-        } else {
-          await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
-        }
-      } catch (error) {
-        if (error.message === 'Deployment timeout') {
-          sendUpdate({ error: 'Deployment is taking longer than expected. Please check back later.' });
-          // Continue with deployment in the background
-          deploymentPromise.then(() => {
-            sendUpdate({ status: 'completed', message: 'Your AI receptionist is ready!' });
-          }).catch((err) => {
-            console.error('Background deployment failed:', err);
-            sendUpdate({ error: 'Deployment failed. Please try again.' });
-          });
-          return;
-        }
-        throw error;
+      if (i === steps.length - 2) { // Deployment step
+        sendUpdate({ status: 'Deployment', progress: 0 });
+        await deploymentPromise;
+        sendUpdate({ status: 'Deployment', progress: 100 });
+      } else {
+        await simulateProgress(sendUpdate, steps[i], IS_MOCK ? baseTimings[i] : 0);
       }
     }
 
