@@ -26,9 +26,9 @@
             Deploying to +13394997114. New number purchasing will be enabled when payment has been integrated.
         </div>
         
-        <div class="payment-system">
+        <!-- <div class="payment-system">
             Payment System (Coming Soon)
-        </div>
+        </div> -->
 
         <div class="additional-actions">
             <div class="reveal-button-container">
@@ -44,6 +44,52 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- Add this after the existing reveal-button-container div -->
+        <div id="paymentSection">
+            <h2>Choose Your Plan</h2>
+            <div class="toggle-container">
+                <span>Monthly</span>
+                <label class="switch">
+                    <input type="checkbox" id="billingToggle">
+                    <span class="slider round"></span>
+                </label>
+                <span>Annually</span>
+            </div>
+            <div class="pricing-cards">
+                <div class="pricing-card" data-tier="basic">
+                    <h3>Basic</h3>
+                    <p class="price">$<span class="amount">29</span>/month</p>
+                    <ul>
+                        <li>Up to 100 calls/month</li>
+                        <li>Basic AI features</li>
+                        <li>Email support</li>
+                    </ul>
+                    <button class="select-plan">Select Plan</button>
+                </div>
+                <div class="pricing-card" data-tier="pro">
+                    <h3>Pro</h3>
+                    <p class="price">$<span class="amount">79</span>/month</p>
+                    <ul>
+                        <li>Up to 500 calls/month</li>
+                        <li>Advanced AI features</li>
+                        <li>24/7 support</li>
+                    </ul>
+                    <button class="select-plan">Select Plan</button>
+                </div>
+                <div class="pricing-card" data-tier="enterprise">
+                    <h3>Enterprise</h3>
+                    <p class="price">$<span class="amount">199</span>/month</p>
+                    <ul>
+                        <li>Unlimited calls</li>
+                        <li>Custom AI training</li>
+                        <li>Dedicated account manager</li>
+                    </ul>
+                    <button class="select-plan">Select Plan</button>
+                </div>
+            </div>
+            <button id="continueToDeployment">Continue to Deployment</button>
         </div>
 
         <div class="card">
@@ -269,7 +315,7 @@
                         <div id="livePrompt"></div>
                     </div>
 
-                    <button type="submit">Create My AI Receptionist</button>
+                    <button type="submit">Pay & Create My AI Receptionist</button>
                 </form>
             </div>
             <div class="step-content" id="step2-content">

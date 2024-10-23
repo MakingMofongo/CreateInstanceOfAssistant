@@ -4,7 +4,8 @@
   "description": "An AI receptionist for hotels using OpenAI API",
   "main": "main.js",
   "scripts": {
-    "start": "node main.js"
+    "start": "node main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
@@ -20,14 +21,16 @@
     "@google-cloud/run": "^1.4.0",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "express": "^4.21.0",
     "express-session": "^1.18.0",
     "httpdispatcher": ">=2.1.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
     "openai": "^4.55.7",
     "sinon": "^19.0.2",
-    "twilio": "^5.3.4"
+    "twilio": "^5.3.4",
+    "body-parser": "^1.20.3",
+    "razorpay": "^2.9.4"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const OpenAI = require('openai');
 const multer = require('multer');
+const Razorpay = require('razorpay');
+const { validateWebhookSignature } = require('razorpay/dist/utils/razorpay-utils');
 const { clone, generateCredentials } = require('./cloner');
 const { deployment, sanitizeServiceName, generateRandomString, authenticateServiceAccount } = require('./deployment');
 const { updatePhoneNumber } = require('./Twilio_Number_Routing/change_existing_url');
@@ -25,6 +27,11 @@ const botCreationProgress = new Map();
 
 let lastDeploymentTime = 300000; // Default to 5 minutes
 
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
 if (!IS_MOCK) {
   authenticateServiceAccount()
     .then(() => {
@@ -43,6 +50,70 @@ if (!IS_MOCK) {
 function startServer() {
   app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
+
+  app.post('/create-order', async (req, res) => {
+    try {
+      const { amount, currency, receipt, notes } = req.body;
+
+      const options = {
+        amount: amount, // amount in the smallest currency unit
+        currency,
+        receipt,
+        notes,
+      };
+
+      const order = await razorpay.orders.create(options);
+      
+      // Read current orders, add new order, and write back to the file
+      const orders = readData();
+      orders.push({
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        receipt: order.receipt,
+        status: 'created',
+      });
+      writeData(orders);
+
+      res.json(order); // Send order details to frontend, including order ID
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Error creating order');
+    }
+  });
+
+  app.post('/verify-payment', (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const secret = razorpay.key_secret;
+    const body = razorpay_order_id + '|' + razorpay_payment_id;
+
+    try {
+      const isValidSignature = validateWebhookSignature(body, razorpay_signature, secret);
+      if (isValidSignature) {
+        // Update the order with payment details
+        const orders = readData();
+        const order = orders.find(o => o.order_id === razorpay_order_id);
+        if (order) {
+          order.status = 'paid';
+          order.payment_id = razorpay_payment_id;
+          writeData(orders);
+        }
+        res.status(200).json({ status: 'ok' });
+        console.log("Payment verification successful");
+      } else {
+        res.status(400).json({ status: 'verification_failed' });
+        console.log("Payment verification failed");
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ status: 'error', message: 'Error verifying payment' });
+    }
+  });
+
+  app.get('/payment-success', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'success.html'));
   });
 
   app.post('/create-bot', upload.single('additionalInfo'), async (req, res) => {
@@ -128,6 +199,20 @@ function startServer() {
 
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`Server is running on port ${port}`));
+}
+
+function readData() {
+  const filePath = path.join(__dirname, 'orders.json');
+  if (fs.existsSync(filePath)) {
+    const data = fs.readFileSync(filePath);
+    return JSON.parse(data);
+  }
+  return [];
+}
+
+function writeData(data) {
+  const filePath = path.join(__dirname, 'orders.json');
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
 function generateHotelPrompt(data) {

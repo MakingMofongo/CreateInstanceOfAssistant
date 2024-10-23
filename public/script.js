@@ -87,7 +87,7 @@ function updateProgressUI(data) {
                 </div>
                 <div class="credential-item">
                     <span class="credential-label">🔑 Password:</span>
-                    <span class="credential-value password-hidden" id="password-value">••••••••</span>
+                    <span class="credential-value password-hidden" id="password-value">•••••••</span>
                     <button class="password-toggle" onclick="togglePassword()">Show</button>
                 </div>
                 <p class="password-warning">🔒 Keep these credentials safe and secure!</p>
@@ -170,7 +170,12 @@ function showStep(stepNumber) {
     document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
     
-    document.getElementById(`step${stepNumber}-content`).classList.add('active');
+    if (stepNumber === 1) {
+        document.getElementById('step1-content').style.display = 'block';
+        document.getElementById('paymentSection').style.display = 'none';
+    } else {
+        document.getElementById(`step${stepNumber}-content`).classList.add('active');
+    }
     document.getElementById(`step${stepNumber}`).classList.add('active');
 }
 
@@ -498,3 +503,130 @@ function retryCreation() {
     document.getElementById('progress-steps').innerHTML = '';
     showStep(1);
 }
+
+// Show payment section after form submission
+document.getElementById('createBotForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Check if a pricing plan is selected
+    const selectedCard = document.querySelector('.pricing-card.selected');
+    if (!selectedCard) {
+        alert('Please select a pricing plan before proceeding.');
+        return;
+    }
+    
+    const tier = selectedCard.getAttribute('data-tier');
+    const isAnnual = document.getElementById('billingToggle').checked;
+    const amount = parseInt(selectedCard.querySelector('.amount').textContent);
+    const finalAmount = isAnnual ? amount * 10 : amount;
+
+    // Initiate Razorpay payment
+    payNow(finalAmount, tier);
+});
+
+async function payNow(amount, tier) {
+    const amountInCents = Math.round(amount * 100);
+
+    const response = await fetch('/create-order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: amountInCents, currency: 'INR', receipt: tier, notes: {} })
+    });
+
+    const order = await response.json();
+
+    const options = {
+        key: 'rzp_test_nsT1ElDtX6gLGd', // Replace with your Razorpay key
+        amount: order.amount,
+        currency: order.currency,
+        name: 'Your Company Name',
+        description: `Payment for ${tier}`,
+        order_id: order.id,
+        callback_url: '/payment-success',
+        prefill: {
+            name: 'Your Name',
+            email: 'your.email@example.com',
+            contact: '9999999999'
+        },
+        theme: {
+            color: '#F37254'
+        },
+        handler: function (response) {
+            fetch('/verify-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature
+                })
+            }).then(res => res.json())
+              .then(data => {
+                  if (data.status === 'ok') {
+                      alert('Payment successful! Proceeding with deployment.');
+                      // Proceed with deployment
+                      document.getElementById('paymentSection').style.display = 'none';
+                      showStep(2);
+                  } else {
+                      alert('Payment verification failed. Please try again.');
+                  }
+              }).catch(error => {
+                  console.error('Error:', error);
+                  alert('Error verifying payment');
+              });
+        }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+}
+
+// Toggle between monthly and annual billing
+document.getElementById('billingToggle').addEventListener('change', function() {
+    const isAnnual = this.checked;
+    const cards = document.querySelectorAll('.pricing-card');
+    cards.forEach(card => {
+        const amountElement = card.querySelector('.amount');
+        let amount = parseInt(amountElement.textContent);
+        if (isAnnual) {
+            amount = Math.round(amount * 10); // 2 months free for annual
+        } else {
+            amount = Math.round(amount / 10);
+        }
+        amountElement.textContent = amount;
+        card.querySelector('.price').innerHTML = `$<span class="amount">${amount}</span>/${isAnnual ? 'year' : 'month'}`;
+    });
+});
+
+// Handle card selection
+document.querySelectorAll('.select-plan').forEach(button => {
+    button.addEventListener('click', function() {
+        document.querySelectorAll('.pricing-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        this.closest('.pricing-card').classList.add('selected');
+    });
+});
+
+// Continue to deployment
+document.getElementById('continueToDeployment').addEventListener('click', function() {
+    const selectedCard = document.querySelector('.pricing-card.selected');
+    if (!selectedCard) {
+        alert('Please select a plan before continuing.');
+        return;
+    }
+    const tier = selectedCard.getAttribute('data-tier');
+    const isAnnual = document.getElementById('billingToggle').checked;
+    const amount = selectedCard.querySelector('.amount').textContent;
+    console.log(`Selected plan: ${tier}, Billing: ${isAnnual ? 'Annual' : 'Monthly'}, Amount: $${amount}`);
+    
+    // Here you would typically send this information to your server
+    // For now, we'll just move to the next step
+    document.getElementById('paymentSection').style.display = 'none';
+    showStep(2);
+});
+
