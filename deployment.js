@@ -2,13 +2,25 @@ const { spawn } = require('child_process');
 const { log } = require('console');
 const path = require('path');
 const fs = require('fs');
+const EventEmitter = require('events');
 
 const IS_MOCK = process.env.IS_MOCK === 'true';
 const IS_WINDOWS = process.platform === 'win32';
 
+class DeploymentEmitter extends EventEmitter {}
+
+const deploymentEmitter = new DeploymentEmitter();
+
 function sanitizeServiceName(name) {
+    // Remove any non-alphanumeric characters except dashes
     let sanitized = name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    // Remove any leading or trailing dashes
     sanitized = sanitized.replace(/^-+|-+$/g, '');
+    // Ensure it doesn't start with 'goog'
+    if (sanitized.startsWith('goog')) {
+        sanitized = 'service-' + sanitized;
+    }
+    // Truncate to 63 characters if longer
     return sanitized.slice(0, 63);
 }
 
@@ -42,14 +54,24 @@ async function authenticateServiceAccount() {
     }
 }
 
-async function deployment(serviceName, folder_name, randomSuffix) {
-    serviceName = sanitizeServiceName(serviceName + '-' + randomSuffix);
-    log('serviceName:', serviceName);
+async function deployment(serviceName, folderName, randomSuffix) {
+    console.log('Original serviceName:', serviceName);
+    
+    // Sanitize the base service name
+    const baseServiceName = sanitizeServiceName(serviceName.split('-')[0]);
+    
+    // Add the random suffix
+    const finalServiceName = `${baseServiceName}-${randomSuffix}`;
+
+    // Ensure the final name is not longer than 63 characters
+    const truncatedServiceName = finalServiceName.slice(0, 63);
+
+    console.log('Final sanitized service name:', truncatedServiceName);
 
     const projectId = 'canvas-replica-402316';
 
     let command;
-    if (folder_name === null) {
+    if (folderName === null) {
         // For empty deployment, create a simple Express server
         const tempDir = 'temp_empty_service';
         if (!fs.existsSync(tempDir)) {
@@ -94,48 +116,83 @@ CMD [ "node", "server.js" ]
 `;
         fs.writeFileSync(path.join(tempDir, 'Dockerfile'), dockerfileContent);
         
-        command = `gcloud run deploy ${serviceName} --source ${tempDir} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
+        command = `gcloud run deploy ${truncatedServiceName} --source ${tempDir} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
     } else {
-        command = `gcloud run deploy ${serviceName} --source ${folder_name} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
+        command = `gcloud run deploy ${truncatedServiceName} --source ${folderName} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
     }
 
-    log('Executing command:', command);
+    console.log('Executing command:', command);
 
     if (IS_MOCK) {
-        return mockDeployment(serviceName);
+        return mockDeployment(finalServiceName);
     }
 
-    const result = await executeCommand(command, folder_name);
-    
-    // Extract the URL from the deployment output
-    const urlMatch = result.output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
-    const serviceUrl = urlMatch ? urlMatch[1] : null;
+    try {
+        const result = await executeCommand(command, folderName);
+        console.log('Deployment result:', result);
+        
+        // Extract the URL from the deployment output
+        const urlMatch = result.output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
+        const serviceUrl = urlMatch ? urlMatch[1] : null;
 
-    return {
-        ...result,
-        serviceUrl: serviceUrl
-    };
+        console.log('Extracted Service URL:', serviceUrl);
+
+        return {
+            ...result,
+            serviceUrl: serviceUrl
+        };
+    } catch (error) {
+        console.log('Deployment error:', error);
+        throw error;
+    }
 }
 
 function executeCommand(command, folder_name) {
     return new Promise((resolve, reject) => {
+        console.log('Starting command execution:', command);
         const process = IS_WINDOWS ? spawn('cmd', ['/c', command]) : spawn('sh', ['-c', command]);
         let output = '';
+        let currentStep = '';
+        let buildingContainerProgress = 0;
 
         process.stdout.on('data', (data) => {
             const chunk = data.toString();
             output += chunk;
-            log('Deployment output:', chunk);
+            console.log('Deployment output:', chunk.trim());
+
+            if (chunk.includes('Building using Dockerfile')) {
+                currentStep = 'Building using Dockerfile';
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 0 });
+            } else if (chunk.includes('Uploading sources')) {
+                currentStep = 'Uploading sources';
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 10 });
+            } else if (chunk.includes('Building Container')) {
+                currentStep = 'Building Container';
+                buildingContainerProgress += 1;
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 10 + (buildingContainerProgress * 0.5) });
+            } else if (chunk.includes('Setting IAM Policy')) {
+                currentStep = 'Setting IAM Policy';
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 70 });
+            } else if (chunk.includes('Creating Revision')) {
+                currentStep = 'Creating Revision';
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 80 });
+            } else if (chunk.includes('Routing traffic')) {
+                currentStep = 'Routing traffic';
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 90 });
+            } else if (chunk.includes('Service URL:')) {
+                currentStep = 'Deployment complete';
+                deploymentEmitter.emit('progress', { step: currentStep, progress: 100 });
+            }
         });
 
         process.stderr.on('data', (data) => {
             const chunk = data.toString();
             output += chunk;
-            log('Deployment Info:', chunk);
+            console.log('Deployment error output:', chunk.trim()); // Live logging of stderr
         });
 
         process.on('close', (code) => {
-            log(`Deployment process exited with code ${code}`);
+            console.log(`Deployment process exited with code ${code}`);
             if (code !== 0) {
                 reject({ success: false, message: `Command failed with code ${code}`, output });
                 return;
@@ -165,30 +222,7 @@ function mockDeployment(serviceName) {
     });
 }
 
-function executeCommand(command) {
-    return new Promise((resolve, reject) => {
-        const process = IS_WINDOWS ? spawn('cmd', ['/c', command]) : spawn('sh', ['-c', command]);
-        let output = '';
-
-        process.stdout.on('data', (data) => {
-            output += data.toString();
-        });
-
-        process.stderr.on('data', (data) => {
-            output += data.toString();
-        });
-
-        process.on('close', (code) => {
-            if (code !== 0) {
-                reject({ success: false, message: `Command failed with code ${code}`, output });
-            } else {
-                resolve({ success: true, output });
-            }
-        });
-    });
-}
-
-module.exports = { deployment, sanitizeServiceName, generateRandomString, authenticateServiceAccount };
+module.exports = { deployment, sanitizeServiceName, generateRandomString, authenticateServiceAccount, deploymentEmitter };
 
 // // Example usage with async/await
 // (async () => {

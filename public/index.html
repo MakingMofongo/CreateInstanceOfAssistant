@@ -10,8 +10,27 @@
     <link rel="stylesheet" href="styles.css">
     <!-- External JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
+    <div id="user-bar" class="user-bar">
+        <div class="user-info">
+            <img src="https://api.dicebear.com/6.x/initials/svg?seed=JD" alt="User Avatar" class="user-avatar">
+            <span class="user-name">John Doe</span>
+        </div>
+        <nav class="user-nav">
+            <button class="nav-item" data-action="account">
+                <i class="fas fa-user-circle"></i> Account
+            </button>
+            <button class="nav-item" data-action="settings">
+                <i class="fas fa-cog"></i> Settings
+            </button>
+            <button class="nav-item" data-action="logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </nav>
+    </div>
+
     <div class="container">
         <div class="logo">
             <svg width="150" height="50" viewBox="0 0 150 50" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -292,6 +311,23 @@
                     WARNING: The username and password are NOT SAVED anywhere. You MUST save them securely, or you will lose access to your assistant.
                 </div>
             </div>
+            <div class="step-content" id="step4-content">
+                <h2>Retrieve Your AI Receptionist Information</h2>
+                <form id="retrieveDataForm">
+                    <div class="form-group">
+                        <label for="requestIdInput">Enter your Request ID:</label>
+                        <input type="text" id="requestIdInput" name="requestId" required>
+                    </div>
+                    <button type="submit">Retrieve Data</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="deployed-bots-section" class="deployed-bots-section">
+            <h2>Your Deployed Bots</h2>
+            <div id="bot-list" class="bot-list">
+                <!-- Bots will be dynamically added here -->
+            </div>
         </div>
     </div>
 
@@ -324,7 +360,37 @@
         <div id="persistentPromptContent"></div>
     </div>
 
+    <!-- User Account Modal -->
+    <div id="account-modal" class="modal">
+        <div class="modal-content">
+            <h2>Account Information</h2>
+            <p><strong>Name:</strong> <span id="modal-user-name"></span></p>
+            <p><strong>Email:</strong> <span id="modal-user-email"></span></p>
+            <button id="close-modal">Close</button>
+        </div>
+    </div>
+
+    <!-- Bot Details Modal -->
+    <div id="bot-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Bot Details</h2>
+            <div id="bot-details"></div>
+        </div>
+    </div>
+
     <!-- External JavaScript -->
     <script src="script.js"></script>
+    <!-- Add this script at the end of the body -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'login.html';
+            }
+        });
+    </script>
+    <script src="user-bar.js"></script>
+    <script src="deployed-bots.js"></script>
 </body>
 </html>

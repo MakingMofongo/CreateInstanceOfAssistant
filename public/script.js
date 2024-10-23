@@ -2,6 +2,10 @@
 let currentRequestId = null;
 let isDeploymentOngoing = false;
 
+// Add these variables at the top of your script
+let isPersistentPromptOpen = false;
+let userClosedPrompt = false;
+
 document.getElementById('createBotForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -22,13 +26,22 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
     showStep(2);
     
     try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            throw new Error('No authentication token found. Please log in again.');
+        }
+
         const response = await fetch('/create-bot', {
             method: 'POST',
             body: formData,
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
         
         if (!response.ok) {
-            throw new Error('Failed to initiate bot creation');
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to initiate bot creation');
         }
         
         const { requestId } = await response.json();
@@ -48,13 +61,12 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
         eventSource.onerror = function(error) {
             console.error('EventSource failed:', error);
             eventSource.close();
-            if (isDeploymentOngoing) {
-                retrieveFinalData(requestId);
-            }
+            isDeploymentOngoing = false;
+            updateProgressUI({ error: 'Connection lost. Please check server logs and try again.' });
         };
     } catch (error) {
         console.error('Fetch error:', error);
-        updateProgressUI({ error: 'Failed to send data. Please try again.' });
+        updateProgressUI({ error: 'Failed to send data. Please try again. Error: ' + error.message });
     }
 });
 
@@ -101,7 +113,7 @@ function updateProgressUI(data) {
             <div class="credentials-section">
                 <div class="credentials-title">🎉 Your AI Receptionist is Ready! 🎉</div>
                 <div class="credential-item">
-                    <span class="credential-label">📞 Phone Number:</span>
+                    <span class="credential-label"> Phone Number:</span>
                     <span class="credential-value">${data.phoneNumber}</span>
                 </div>
                 <div class="credential-item">
@@ -127,8 +139,9 @@ function updateProgressUI(data) {
         document.getElementById('completion-details').innerHTML += `
             <p>If you lose this information, you can retrieve it later using your request ID: ${currentRequestId}</p>`;
     } else if (data.error) {
-        isDeploymentOngoing = false;
-        const errorStep = progressSteps.querySelector('.progress-step.error') || document.createElement('div');
+        isDeploymentOngoing = false; // Stop the deployment process
+        progressSteps.innerHTML = ''; // Clear existing progress steps
+        const errorStep = document.createElement('div');
         errorStep.className = 'progress-step error';
         errorStep.innerHTML = `
             <div class="progress-step-header">
@@ -137,9 +150,7 @@ function updateProgressUI(data) {
             </div>
             <div class="progress-step-description">${data.error}</div>
         `;
-        if (!progressSteps.contains(errorStep)) {
-            progressSteps.appendChild(errorStep);
-        }
+        progressSteps.appendChild(errorStep);
         showErrorMessage(data.error);
     } else if (data.status !== 'end' && data.status !== 'Connected') {
         const currentStep = steps.findIndex(step => step.title.toLowerCase() === data.status.toLowerCase());
@@ -149,9 +160,9 @@ function updateProgressUI(data) {
                 const stepStatus = index < currentStep ? 'completed' : index === currentStep ? 'active' : '';
                 const stepProgress = index < currentStep ? 100 : (index === currentStep ? data.progress : 0);
                 if (stepElement) {
-                    updateStepProgress(stepElement, stepStatus, stepProgress);
+                    updateStepProgress(stepElement, stepStatus, stepProgress, data.substep);
                 } else {
-                    progressSteps.innerHTML += createStepHTML(step, stepStatus, stepProgress);
+                    progressSteps.innerHTML += createStepHTML(step, stepStatus, stepProgress, data.substep);
                 }
             });
         }
@@ -159,7 +170,7 @@ function updateProgressUI(data) {
 }
 
 // Create Step HTML
-function createStepHTML(step, status, progress) {
+function createStepHTML(step, status, progress, substep) {
     return `
         <div class="progress-step ${status}">
             <div class="progress-step-header">
@@ -171,16 +182,24 @@ function createStepHTML(step, status, progress) {
                 <div class="progress-bar-fill" style="width: ${progress}%"></div>
             </div>
             <div class="progress-step-time">${step.time}</div>
+            ${substep ? `<div class="progress-substep">${substep}</div>` : ''}
         </div>
     `;
 }
 
 // Update Step Progress
-function updateStepProgress(stepElement, status, progress) {
-    if (stepElement) {
-        stepElement.className = `progress-step ${status}`;
-        stepElement.querySelector('.progress-step-icon').textContent = status === 'completed' ? '✓' : '';
-        stepElement.querySelector('.progress-bar-fill').style.width = `${progress}%`;
+function updateStepProgress(stepElement, status, progress, substep) {
+    stepElement.className = `progress-step ${status}`;
+    stepElement.querySelector('.progress-step-icon').textContent = status === 'completed' ? '✓' : '';
+    stepElement.querySelector('.progress-bar-fill').style.width = `${progress}%`;
+    if (substep) {
+        let substepElement = stepElement.querySelector('.progress-substep');
+        if (!substepElement) {
+            substepElement = document.createElement('div');
+            substepElement.className = 'progress-substep';
+            stepElement.appendChild(substepElement);
+        }
+        substepElement.textContent = substep;
     }
 }
 
@@ -261,6 +280,15 @@ document.getElementById('botType').addEventListener('change', function() {
 // Update Live Prompt as User Fills the Form
 document.querySelectorAll('#createBotForm input, #createBotForm select, #createBotForm textarea').forEach(element => {
     element.addEventListener('input', updateLivePrompt);
+    element.addEventListener('focus', () => {
+        if (!userClosedPrompt) {
+            const persistentPrompt = document.getElementById('persistentPrompt');
+            persistentPrompt.classList.remove('closed');
+            persistentPrompt.classList.add('open');
+            document.getElementById('togglePrompt').textContent = '▼';
+            isPersistentPromptOpen = true;
+        }
+    });
 });
 
 function updateLivePrompt() {
@@ -522,17 +550,89 @@ function showErrorMessage(message) {
     errorDiv.className = 'error-message';
     errorDiv.innerHTML = `
         <p>${message}</p>
-        ${message.includes('taking longer than expected') ? 
-            '<p>You can close this page and check back later using the provided URL.</p>' :
-            '<button onclick="retryCreation()">Try Again</button>'}
+        <p>An error occurred during the bot creation process. Please check the server logs for more details.</p>
+        <button onclick="retryCreation()">Try Again</button>
     `;
     document.getElementById('step2-content').appendChild(errorDiv);
 }
 
 // Add this new function to retry the creation process
 function retryCreation() {
-    document.querySelector('.error-message').remove();
+    document.querySelector('.error-message')?.remove();
     document.getElementById('progress-steps').innerHTML = '';
     showStep(1);
 }
 
+// Add this function to the script.js file
+function retrieveBotData(requestId) {
+  fetch(`/retrieve-bot-data?requestId=${requestId}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to retrieve bot data');
+      }
+      return response.json();
+    })
+    .then(data => {
+      // Display the retrieved data
+      document.getElementById('completion-details').innerHTML = `
+        <div class="credentials-section">
+          <div class="credentials-title">🎉 Your AI Receptionist Information 🎉</div>
+          <div class="credential-item">
+            <span class="credential-label">📞 Phone Number:</span>
+            <span class="credential-value">${data.phoneNumber}</span>
+          </div>
+          <div class="credential-item">
+            <span class="credential-label">🌐 Service URL:</span>
+            <span class="credential-value clickable-url" onclick="window.open('${data.serviceUrl}/login', '_blank')">${data.serviceUrl}/login</span>
+            <br><small>(Click to open the CONSOLE for this agent)</small>
+          </div>
+          <div class="credential-item">
+            <span class="credential-label">👤 Username:</span>
+            <span class="credential-value">${data.username}</span>
+          </div>
+          <div class="credential-item">
+            <span class="credential-label">🔑 Password:</span>
+            <span class="credential-value password-hidden" id="password-value">••••••••</span>
+            <button class="password-toggle" onclick="togglePassword()">Show</button>
+          </div>
+          <p class="password-warning">🔒 Keep these credentials safe and secure!</p>
+        </div>`;
+      
+      window.generatedPassword = data.password;
+      showStep(3);
+    })
+    .catch(error => {
+      console.error('Error retrieving bot data:', error);
+      alert('Failed to retrieve bot data. Please try again or contact support.');
+    });
+}
+
+// Add this to allow users to input their request ID and retrieve data
+document.getElementById('retrieveDataForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const requestId = document.getElementById('requestIdInput').value;
+  retrieveBotData(requestId);
+});
+
+// Add this new function to handle the persistent prompt toggle
+function togglePersistentPrompt() {
+    const persistentPrompt = document.getElementById('persistentPrompt');
+    const toggleButton = document.getElementById('togglePrompt');
+
+    if (persistentPrompt.classList.contains('open')) {
+        persistentPrompt.classList.remove('open');
+        persistentPrompt.classList.add('closed');
+        toggleButton.textContent = '▲';
+        isPersistentPromptOpen = false;
+        userClosedPrompt = true;
+    } else {
+        persistentPrompt.classList.remove('closed');
+        persistentPrompt.classList.add('open');
+        toggleButton.textContent = '▼';
+        isPersistentPromptOpen = true;
+        userClosedPrompt = false;
+    }
+}
+
+// Add this event listener for the toggle button
+document.getElementById('togglePrompt').addEventListener('click', togglePersistentPrompt);

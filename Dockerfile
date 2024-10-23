@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Copy package.json and package-lock.json (if available)
 COPY package*.json ./
+
 # Install dependencies
 RUN apt-get update && apt-get install -y npm && npm install
 
@@ -18,10 +19,11 @@ COPY google_creds.json .
 COPY Twilio_Number_Routing ./Twilio_Number_Routing
 COPY public ./public
 COPY Source ./Source
+COPY models ./models
+COPY middleware ./middleware
 
 # Create the hotel_data directory
 RUN mkdir -p hotel_data && chmod 777 hotel_data
-
 
 # Expose the port the app runs on
 EXPOSE 3000
