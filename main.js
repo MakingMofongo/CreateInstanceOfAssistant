@@ -14,6 +14,8 @@ const { clone, generateCredentials } = require('./cloner');
 const { deployment, sanitizeServiceName, generateRandomString, authenticateServiceAccount, deploymentEmitter } = require('./deployment');
 const { updatePhoneNumber } = require('./Twilio_Number_Routing/change_existing_url');
 const { exec } = require('child_process');
+const Razorpay = require('razorpay');
+const { validateWebhookSignature } = require('razorpay/dist/utils/razorpay-utils');
 
 const app = express();
 app.use(express.json());
@@ -114,6 +116,16 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     console.log('Login attempt for user:', email);
+
+    // Check for test user
+    if (email === 'test@gmail.com' && password === 'test') {
+      console.log('Test user login successful');
+      const testUser = { _id: 'test_user_id', email: 'test@gmail.com' };
+      const token = jwt.sign({ id: testUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+      return res.json({ token });
+    }
+
+    // Regular user authentication
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       console.log('Login failed for user:', email);
@@ -579,4 +591,110 @@ app.get('/api/user', protect, async (req, res) => {
         console.error('Error fetching user data:', error);
         res.status(500).json({ message: 'Error fetching user data' });
     }
+});
+
+// Initialize Razorpay
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
+console.log('Razorpay initialized with key_id:', process.env.RAZORPAY_KEY_ID);
+
+// Function to read data from JSON file
+const readData = () => {
+    if (fs.existsSync('orders.json')) {
+        const data = fs.readFileSync('orders.json');
+        return JSON.parse(data);
+    }
+    return [];
+};
+
+// Function to write data to JSON file
+const writeData = (data) => {
+    fs.writeFileSync('orders.json', JSON.stringify(data, null, 2));
+};
+
+// Initialize orders.json if it doesn't exist
+if (!fs.existsSync('orders.json')) {
+    writeData([]);
+}
+
+// Route to handle order creation
+app.post('/create-order', async (req, res) => {
+    console.log('Received create-order request');
+    try {
+        const { amount, currency, receipt, notes } = req.body;
+        console.log('Request body:', { amount, currency, receipt, notes });
+
+        if (!amount || !currency || !receipt) {
+            console.log('Missing required fields');
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        const options = {
+            amount: amount,
+            currency,
+            receipt,
+            notes,
+        };
+
+        console.log('Creating Razorpay order with options:', options);
+        const order = await razorpay.orders.create(options);
+        console.log('Razorpay order created:', order);
+        
+        // Read current orders, add new order, and write back to the file
+        const orders = readData();
+        orders.push({
+            order_id: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            receipt: order.receipt,
+            status: 'created',
+        });
+        writeData(orders);
+
+        res.json(order);
+    } catch (error) {
+        console.error('Error creating Razorpay order:', error);
+        res.status(500).json({ message: 'Error creating order', error: error.message });
+    }
+});
+
+// Route to handle payment verification
+app.post('/verify-payment', (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const secret = razorpay.key_secret;
+    const body = razorpay_order_id + '|' + razorpay_payment_id;
+
+    try {
+        const isValidSignature = validateWebhookSignature(body, razorpay_signature, secret);
+        if (isValidSignature) {
+            // Update the order with payment details
+            const orders = readData();
+            const order = orders.find(o => o.order_id === razorpay_order_id);
+            if (order) {
+                order.status = 'paid';
+                order.payment_id = razorpay_payment_id;
+                writeData(orders);
+            }
+            res.status(200).json({ status: 'ok' });
+            console.log("Payment verification successful");
+        } else {
+            res.status(400).json({ status: 'verification_failed' });
+            console.log("Payment verification failed");
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: 'error', message: 'Error verifying payment' });
+    }
+});
+
+app.get('/test-json', (req, res) => {
+    res.json({ message: 'This is a test JSON response' });
+});
+
+app.get('/payment-success', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'success.html'));
 });

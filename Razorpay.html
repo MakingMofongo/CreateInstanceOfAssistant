@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon-32x32.png" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet" />
+  <!-- <link rel="stylesheet" href="styles.css"> -->
+  <link rel="stylesheet" href="styles2.css">
+  <title>Pricing Component with Razorpay</title>
+</head>
+<body class="razorpay-page">
+  <nav class="navbar">
+    <div class="container">
+      <div class="logo">
+        <span class="red-text">KOKO</span> AI
+      </div>
+        <ul class="nav-links">
+            <li><a href="index.html#home">Home</a></li>
+            <li><a href="index.html#about">About Us</a></li>
+            <li><a href="index.html#forms">Form Templates</a></li>
+        </ul>
+        <div class="hamburger">
+          <span></span>
+          <span></span>
+          <span></span>
+      </div>
+    </div>
+</nav>
+
+  <section class="pricing-section">
+  <header>
+    <h1>Our Pricing</h1>
+    <div class="toggle">
+      <label>Monthly</label>
+      <div class="toggle-btn">
+        <input type="checkbox" class="checkbox" id="checkbox" />
+        <label class="sub" id="sub" for="checkbox">
+          <div class="circle"></div>
+        </label>
+      </div>
+      <label>Annually</label>
+    </div>
+  </header>
+
+  <div class="cards">
+    <!-- Tier 3 -->
+    <div class="card shadow">
+      <ul>
+        <li class="pack">Basic</li>
+        <li id="basic" class="price bottom-bar">€49.99</li>
+        <li class="bottom-bar">Perfect for small businesses</li>
+        <li class="bottom-bar">2 AI Receptionists </li>
+        <li class="bottom-bar">Support for 1 Language</li>
+        <li class="bottom-bar">Basic Support</li>
+        <li><button class="btn" onclick="payNow(49.99, 'Basic')">Pay Now</button></li>
+      </ul>
+    </div>
+
+    <!-- Tier 2 --> 
+    <div class="card active shadow">
+      <ul>
+        <li class="pack">Professional</li>
+        <li id="professional" class="price bottom-bar">€149.99</li>
+        <li class="bottom-bar">Ideal for mid-sized or growing businesses</li>
+        <li class="bottom-bar">5 AI Receptionists</li>
+        <li class="bottom-bar">Support for 2 Languages</li>
+        <li class="bottom-bar">Advanced Support</li>
+        <li><button class="btn active-btn" onclick="payNow(149.99, 'Professional')">Pay Now</button></li>
+      </ul>
+    </div>
+
+    <!-- Tier 1 -->
+    <div class="card shadow">
+      <ul>
+        <li class="pack">Master</li>
+        <li id="master" class="price bottom-bar">€299.99</li>
+        <li class="bottom-bar">Designed for large businesses</li>
+        <li class="bottom-bar">10 AI Receptionists</li>
+        <li class="bottom-bar">Support for 3 languages</li>
+        <li class="bottom-bar">Priority Support</li>
+        <li><button class="btn" onclick="payNow(299.99, 'Master')">Pay Now</button></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+      <p>&copy; 2024 Your Company. All rights reserved.</p>
+      <div class="social-links">
+          <!-- <a href="#"><img src="https://via.placeholder.com/24" alt="Facebook"></a>
+          <a href="#"><img src="https://via.placeholder.com/24" alt="Twitter"></a>
+          <a href="#"><img src="https://via.placeholder.com/24" alt="LinkedIn"></a> -->
+      </div>
+  </div>
+</footer>
+
+<script>
+  const hamburger = document.querySelector('.hamburger');
+  const navLinks = document.querySelector('.nav-links');
+
+  hamburger.addEventListener('click', () => {
+      navLinks.classList.toggle('active');
+      hamburger.classList.toggle('toggle');
+  });
+</script>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    // Fetching the elements
+    const checkbox = document.getElementById("checkbox");
+    const basicPriceElem = document.getElementById("basic");
+    const professionalPriceElem = document.getElementById("professional");
+    const masterPriceElem = document.getElementById("master");
+
+    // Prices for monthly and annual subscriptions
+    const prices = {
+      basic: { monthly: 49.99, annual: 499.99 },
+      professional: { monthly: 149.99, annual: 1499.99 },
+      master: { monthly: 299.99, annual: 2999.99 },
+    };
+
+    // Function to update prices based on toggle state
+    function updatePrices() {
+      if (!checkbox.checked) {
+        // Monthly prices
+        basicPriceElem.textContent = `€${prices.basic.monthly}`;
+        professionalPriceElem.textContent = `€${prices.professional.monthly}`;
+        masterPriceElem.textContent = `€${prices.master.monthly}`;
+      } else {
+        // Annual prices
+        basicPriceElem.textContent = `€${prices.basic.annual}`;
+        professionalPriceElem.textContent = `€${prices.professional.annual}`;
+        masterPriceElem.textContent = `€${prices.master.annual}`;
+      }
+    }
+
+    // Set initial pricing to monthly
+    updatePrices();
+
+    // Event listener to toggle the pricing
+    checkbox.addEventListener("click", updatePrices);
+
+    // Razorpay payment integration
+    async function payNow(baseAmount, tier) {
+      const isMonthly = !checkbox.checked;
+      const amount = isMonthly ? baseAmount : baseAmount * 10;
+      const amountInCents = Math.round(amount * 100);
+
+      console.log(`Paying €${amount} for ${tier}. Amount in cents: ${amountInCents}`);
+
+      const response = await fetch('/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: amountInCents, currency: 'EUR', receipt: tier, notes: {} })
+      });
+
+      const order = await response.json();
+
+      const options = {
+        key: 'rzp_test_nsT1ElDtX6gLGd',
+        amount: order.amount,
+        currency: order.currency,
+        name: 'Your Company Name',
+        description: `Payment for ${tier}`,
+        order_id: order.id,
+        callback_url: '/payment-success',
+        prefill: {
+          name: 'Your Name',
+          email: 'your.email@example.com',
+          contact: '9999999999'
+        },
+        theme: {
+          color: '#F37254'
+        },
+        handler: function (response) {
+          fetch('/verify-payment', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          }).then(res => res.json())
+            .then(data => {
+              if (data.status === 'ok') {
+                window.location.href = '/payment-success';
+              } else {
+                alert('Payment verification failed');
+              }
+            }).catch(error => {
+              console.error('Error:', error);
+              alert('Error verifying payment');
+            });
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    }
+  </script>
+</body>
+</html>

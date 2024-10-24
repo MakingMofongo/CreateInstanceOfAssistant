@@ -5,6 +5,8 @@ let isDeploymentOngoing = false;
 // Add these variables at the top of your script
 let isPersistentPromptOpen = false;
 let userClosedPrompt = false;
+let selectedPlan = null;
+let selectedAmount = 0;
 
 document.getElementById('createBotForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -23,51 +25,8 @@ document.getElementById('createBotForm').addEventListener('submit', async functi
         formData.append('additionalInfo', fileInput.files[0]);
     }
     
+    // Show the pricing step
     showStep(2);
-    
-    try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            throw new Error('No authentication token found. Please log in again.');
-        }
-
-        const response = await fetch('/create-bot', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to initiate bot creation');
-        }
-        
-        const { requestId } = await response.json();
-        currentRequestId = requestId;
-        isDeploymentOngoing = true;
-        const eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
-        
-        eventSource.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            updateProgressUI(data);
-            if (data.status === 'completed' || data.error) {
-                eventSource.close();
-                isDeploymentOngoing = false;
-            }
-        };
-        
-        eventSource.onerror = function(error) {
-            console.error('EventSource failed:', error);
-            eventSource.close();
-            isDeploymentOngoing = false;
-            updateProgressUI({ error: 'Connection lost. Please check server logs and try again.' });
-        };
-    } catch (error) {
-        console.error('Fetch error:', error);
-        updateProgressUI({ error: 'Failed to send data. Please try again. Error: ' + error.message });
-    }
 });
 
 async function retrieveFinalData(requestId) {
@@ -226,6 +185,13 @@ function showStep(stepNumber) {
     
     document.getElementById(`step${stepNumber}-content`).classList.add('active');
     document.getElementById(`step${stepNumber}`).classList.add('active');
+
+    console.log(`Showing step ${stepNumber}`); // Add this line for debugging
+
+    // If it's step 2 (pricing), initialize the pricing toggle
+    if (stepNumber === 2) {
+        initializePricingToggle();
+    }
 }
 
 // Celebration Animation
@@ -636,3 +602,147 @@ function togglePersistentPrompt() {
 
 // Add this event listener for the toggle button
 document.getElementById('togglePrompt').addEventListener('click', togglePersistentPrompt);
+
+// Add this new function to handle the pricing toggle
+function initializePricingToggle() {
+    const toggle = document.getElementById('pricingToggle');
+    const priceElements = document.querySelectorAll('.price .amount');
+    const periodElements = document.querySelectorAll('.price .period');
+
+    const monthlyPrices = ['49.99', '149.99', '299.99'];
+    const yearlyPrices = ['499.99', '1499.99', '2999.99'];
+
+    toggle.addEventListener('change', function() {
+        const isYearly = this.checked;
+        priceElements.forEach((el, index) => {
+            el.textContent = isYearly ? yearlyPrices[index] : monthlyPrices[index];
+        });
+        periodElements.forEach(el => {
+            el.textContent = isYearly ? '/year' : '/month';
+        });
+        
+        // Update the data-amount attribute for each button
+        document.querySelectorAll('.select-plan').forEach((button, index) => {
+            const newAmount = isYearly ? parseFloat(yearlyPrices[index]) * 100 : parseFloat(monthlyPrices[index]) * 100;
+            button.setAttribute('data-amount', newAmount.toFixed(0));
+        });
+    });
+}
+
+// Modify the event listeners for the select plan buttons
+document.querySelectorAll('.select-plan').forEach(button => {
+    button.addEventListener('click', function() {
+        selectedPlan = this.getAttribute('data-plan');
+        selectedAmount = parseInt(this.getAttribute('data-amount'));
+        console.log(`Selected plan: ${selectedPlan}, Amount: ${selectedAmount}`);
+        createRazorpayOrder(selectedAmount);
+    });
+});
+
+// Function to create a Razorpay order
+async function createRazorpayOrder(amount) {
+    try {
+        const response = await fetch('/create-order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ amount, currency: 'EUR', receipt: `receipt_${Date.now()}`, notes: {} })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create order');
+        }
+
+        const order = await response.json();
+        openRazorpayCheckout(order);
+    } catch (error) {
+        console.error('Error creating order:', error);
+        alert(`Failed to create order. Error: ${error.message}`);
+    }
+}
+
+// Function to open Razorpay checkout
+function openRazorpayCheckout(order) {
+    const options = {
+        key: 'rzp_test_nsT1ElDtX6gLGd', // Replace with your Razorpay key_id
+        amount: order.amount,
+        currency: order.currency,
+        name: 'KOKOAI',
+        description: `${selectedPlan} Plan Subscription`,
+        order_id: order.id,
+        handler: function (response) {
+            verifyPayment(response);
+        },
+        prefill: {
+            name: 'John Doe',
+            email: 'john@example.com',
+            contact: '9999999999'
+        },
+        theme: {
+            color: '#FF3E3E'
+        },
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+}
+
+// Function to verify payment
+async function verifyPayment(response) {
+    try {
+        const verificationResponse = await fetch('/verify-payment', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+            })
+        });
+
+        const data = await verificationResponse.json();
+        if (data.status === 'ok') {
+            alert('Payment successful!');
+            createBot(); // Call createBot function after successful payment
+        } else {
+            alert('Payment verification failed. Please contact support.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error verifying payment. Please contact support.');
+    }
+}
+
+// Function to create bot after successful payment
+async function createBot() {
+    try {
+        const formData = new FormData(document.getElementById('createBotForm'));
+        const response = await fetch('/create-bot', {
+            method: 'POST',
+            body: formData,
+            // Remove the Authorization header
+            // headers: {
+            //     'Authorization': `Bearer ${localStorage.getItem('token')}`
+            // }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create bot');
+        }
+
+        const data = await response.json();
+        console.log('Bot creation initiated:', data);
+        showStep(3); // Move to the next step after initiating bot creation
+    } catch (error) {
+        console.error('Error creating bot:', error);
+        alert('Failed to create bot. Please try again.');
+    }
+}
+
+// Make sure to call initializePricingToggle when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    initializePricingToggle();
+});

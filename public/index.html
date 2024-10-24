@@ -11,9 +11,12 @@
     <!-- External JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Add this script tag in the head section -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
-    <div id="user-bar" class="user-bar">
+    <!-- Remove or comment out the user bar section -->
+    <!-- <div id="user-bar" class="user-bar">
         <div class="user-info">
             <img src="https://api.dicebear.com/6.x/initials/svg?seed=JD" alt="User Avatar" class="user-avatar">
             <span class="user-name">John Doe</span>
@@ -29,7 +32,7 @@
                 <i class="fas fa-sign-out-alt"></i> Logout
             </button>
         </nav>
-    </div>
+    </div> -->
 
     <div class="container">
         <div class="logo">
@@ -70,6 +73,7 @@
                 <div class="step active" id="step1">1</div>
                 <div class="step" id="step2">2</div>
                 <div class="step" id="step3">3</div>
+                <div class="step" id="step4">4</div>
             </div>
             <div class="step-content active" id="step1-content">
                 <form id="createBotForm">
@@ -292,8 +296,66 @@
                 </form>
             </div>
             <div class="step-content" id="step2-content">
-                <h2>Creating Your AI Receptionist</h2>
-                <div class="progress-container" id="progress-steps"></div>
+                <h2>Choose Your Plan</h2>
+                <div class="pricing-toggle">
+                    <span class="toggle-label">Monthly</span>
+                    <label class="switch">
+                        <input type="checkbox" id="pricingToggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="toggle-label">Yearly</span>
+                </div>
+                <div class="pricing-cards">
+                    <div class="pricing-card">
+                        <div class="card-header">
+                            <h3>Basic</h3>
+                            <div class="price">
+                                <span class="currency">€</span>
+                                <span class="amount">49.99</span>
+                                <span class="period">/month</span>
+                            </div>
+                        </div>
+                        <ul class="features">
+                            <li><i class="fas fa-check"></i> 2 AI Receptionists</li>
+                            <li><i class="fas fa-check"></i> Support for 1 Language</li>
+                            <li><i class="fas fa-check"></i> Basic Support</li>
+                        </ul>
+                        <button class="select-plan" data-plan="basic" data-amount="4999">Select Plan</button>
+                    </div>
+                    <div class="pricing-card featured">
+                        <div class="featured-label">Most Popular</div>
+                        <div class="card-header">
+                            <h3>Professional</h3>
+                            <div class="price">
+                                <span class="currency">€</span>
+                                <span class="amount">149.99</span>
+                                <span class="period">/month</span>
+                            </div>
+                        </div>
+                        <ul class="features">
+                            <li><i class="fas fa-check"></i> 5 AI Receptionists</li>
+                            <li><i class="fas fa-check"></i> Support for 2 Languages</li>
+                            <li><i class="fas fa-check"></i> Advanced Support</li>
+                        </ul>
+                        <button class="select-plan" data-plan="professional" data-amount="14999">Select Plan</button>
+                    </div>
+                    <div class="pricing-card">
+                        <div class="card-header">
+                            <h3>Master</h3>
+                            <div class="price">
+                                <span class="currency">€</span>
+                                <span class="amount">299.99</span>
+                                <span class="period">/month</span>
+                            </div>
+                        </div>
+                        <ul class="features">
+                            <li><i class="fas fa-check"></i> 10 AI Receptionists</li>
+                            <li><i class="fas fa-check"></i> Support for 3 Languages</li>
+                            <li><i class="fas fa-check"></i> Priority Support</li>
+                        </ul>
+                        <button class="select-plan" data-plan="master" data-amount="29999">Select Plan</button>
+                    </div>
+                </div>
             </div>
             <div class="step-content" id="step3-content">
                 <h2>Your AI Receptionist is Ready!</h2>
@@ -360,15 +422,15 @@
         <div id="persistentPromptContent"></div>
     </div>
 
-    <!-- User Account Modal -->
-    <div id="account-modal" class="modal">
+    <!-- Remove or comment out the account modal -->
+    <!-- <div id="account-modal" class="modal">
         <div class="modal-content">
             <h2>Account Information</h2>
             <p><strong>Name:</strong> <span id="modal-user-name"></span></p>
             <p><strong>Email:</strong> <span id="modal-user-email"></span></p>
             <button id="close-modal">Close</button>
         </div>
-    </div>
+    </div> -->
 
     <!-- Bot Details Modal -->
     <div id="bot-details-modal" class="modal">
@@ -382,15 +444,17 @@
     <!-- External JavaScript -->
     <script src="script.js"></script>
     <!-- Add this script at the end of the body -->
-    <script>
+    <!-- Remove the script that checks for token -->
+    <!-- <script>
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('token');
             if (!token) {
                 window.location.href = 'login.html';
             }
         });
-    </script>
-    <script src="user-bar.js"></script>
+    </script> -->
+    <!-- Remove the user-bar.js script if it's no longer needed -->
+    <!-- <script src="user-bar.js"></script> -->
     <script src="deployed-bots.js"></script>
 </body>
 </html>

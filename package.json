@@ -31,7 +31,9 @@
     "nodemailer": "^6.9.14",
     "openai": "^4.55.7",
     "sinon": "^19.0.2",
-    "twilio": "^5.3.4"
+    "twilio": "^5.3.4",
+    "razorpay": "^2.8.6",
+    "body-parser": "^1.19.0"
   },
   "engines": {
     "node": ">=18.0.0"
