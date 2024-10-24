@@ -24,7 +24,7 @@ body {
 .container {
     flex: 1;
     width: 100%;
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
     box-sizing: border-box;
@@ -1231,30 +1231,37 @@ input:checked + .slider:before {
 .pricing-cards {
     display: flex;
     justify-content: center;
-    gap: 2rem;
-    flex-wrap: wrap;
+    gap: 1.5rem;
+    flex-wrap: nowrap; /* Changed from wrap to nowrap */
+    padding: 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .pricing-card {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    padding: 2rem;
-    width: 300px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-radius: 20px;
+    padding: 2rem 1.5rem;
+    width: 280px; /* Reduced from 300px */
     text-align: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
 }
 
 .pricing-card:hover {
     transform: translateY(-10px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 40px rgba(255, 62, 62, 0.2);
+    border-color: var(--primary-color);
 }
 
 .pricing-card.featured {
+    background: linear-gradient(145deg, rgba(255, 62, 62, 0.1), rgba(255, 62, 62, 0.05));
     border: 2px solid var(--primary-color);
-    position: relative;
     transform: scale(1.05);
 }
 
@@ -1263,37 +1270,44 @@ input:checked + .slider:before {
     top: -12px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: var(--primary-color);
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
     color: white;
-    padding: 4px 12px;
+    padding: 6px 16px;
     border-radius: 20px;
     font-size: 0.9rem;
     font-weight: bold;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(255, 62, 62, 0.3);
 }
 
 .card-header {
     margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .pricing-card h3 {
     font-size: 1.8rem;
     margin-bottom: 1rem;
     color: var(--primary-color);
+    letter-spacing: 0.5px;
 }
 
 .price {
-    font-size: 3rem;
+    font-size: 2.5rem; /* Reduced from 3rem */
     font-weight: bold;
     color: var(--text-color);
+    margin: 1rem 0;
 }
 
 .currency {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     vertical-align: super;
+    margin-right: 0.2rem;
 }
 
 .period {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: normal;
     color: var(--text-color);
     opacity: 0.7;
@@ -1302,44 +1316,55 @@ input:checked + .slider:before {
 .features {
     list-style-type: none;
     padding: 0;
-    margin-bottom: 2rem;
+    margin: 0 0 2rem 0;
     flex-grow: 1;
+    text-align: left;
 }
 
 .features li {
     margin-bottom: 1rem;
     color: var(--text-color);
-    font-size: 1.1rem;
+    font-size: 0.95rem;
+    padding-left: 1.5rem;
+    position: relative;
 }
 
 .features i {
     color: var(--primary-color);
-    margin-right: 0.5rem;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .select-plan {
-    background-color: var(--primary-color);
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
     color: white;
     border: none;
-    padding: 1rem 1.5rem;
+    padding: 1rem;
     border-radius: 8px;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.3s ease;
+    transition: all 0.3s ease;
     text-transform: uppercase;
     letter-spacing: 1px;
+    width: 100%;
+    margin-top: auto;
 }
 
 .select-plan:hover {
-    background-color: var(--secondary-color);
     transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(255, 62, 62, 0.3);
+    background: linear-gradient(90deg, var(--secondary-color), var(--primary-color));
 }
 
-@media (max-width: 768px) {
+/* Responsive design for smaller screens */
+@media (max-width: 900px) {
     .pricing-cards {
         flex-direction: column;
         align-items: center;
+        gap: 2rem;
     }
 
     .pricing-card {
@@ -1350,4 +1375,93 @@ input:checked + .slider:before {
     .pricing-card.featured {
         transform: scale(1);
     }
+}
+
+.card-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: auto;
+}
+
+.select-plan {
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: none;
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: 100%;
+}
+
+.select-plan.selected {
+    background: #FF0000;
+    transform: none;
+    box-shadow: none;
+}
+
+.continue-payment {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: 100%;
+}
+
+.continue-payment:hover {
+    background: #45a049;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(76, 175, 80, 0.3);
+}
+
+.pricing-card.selected {
+    background: linear-gradient(145deg, rgba(255, 200, 200, 0.2), rgba(255, 150, 150, 0.15));
+    border-color: #FF0000;
+    transform: translateY(-5px);
+}
+
+.continue-payment-container {
+    text-align: center;
+    margin-top: 2rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+.continue-payment-container.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.continue-payment {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 1.2rem 2.5rem;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.continue-payment:hover {
+    background: #45a049;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
 }

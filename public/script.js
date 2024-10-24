@@ -621,8 +621,8 @@ function initializePricingToggle() {
             el.textContent = isYearly ? '/year' : '/month';
         });
         
-        // Update the data-amount attribute for each button
-        document.querySelectorAll('.select-plan').forEach((button, index) => {
+        // Update the data-amount attribute for both select-plan and continue-payment buttons
+        document.querySelectorAll('.select-plan, .continue-payment').forEach((button, index) => {
             const newAmount = isYearly ? parseFloat(yearlyPrices[index]) * 100 : parseFloat(monthlyPrices[index]) * 100;
             button.setAttribute('data-amount', newAmount.toFixed(0));
         });
@@ -632,11 +632,41 @@ function initializePricingToggle() {
 // Modify the event listeners for the select plan buttons
 document.querySelectorAll('.select-plan').forEach(button => {
     button.addEventListener('click', function() {
+        // Remove selected class from all cards and buttons
+        document.querySelectorAll('.pricing-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.querySelectorAll('.select-plan').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+
+        // Add selected class to clicked button and its parent card
+        this.classList.add('selected');
+        this.closest('.pricing-card').classList.add('selected');
+        
+        // Store the selected plan and amount
         selectedPlan = this.getAttribute('data-plan');
         selectedAmount = parseInt(this.getAttribute('data-amount'));
+        
+        // Show and update the continue payment button
+        const continuePaymentContainer = document.querySelector('.continue-payment-container');
+        const continuePaymentButton = document.querySelector('.continue-payment');
+        continuePaymentButton.setAttribute('data-amount', selectedAmount);
+        
+        // Show the continue payment container with animation
+        continuePaymentContainer.style.display = 'block';
+        setTimeout(() => {
+            continuePaymentContainer.classList.add('visible');
+        }, 50);
+        
         console.log(`Selected plan: ${selectedPlan}, Amount: ${selectedAmount}`);
-        createRazorpayOrder(selectedAmount);
     });
+});
+
+// Add event listener for the continue-payment button
+document.querySelector('.continue-payment').addEventListener('click', function() {
+    const amount = parseInt(this.getAttribute('data-amount'));
+    createRazorpayOrder(amount);
 });
 
 // Function to create a Razorpay order
@@ -746,3 +776,4 @@ async function createBot() {
 document.addEventListener('DOMContentLoaded', () => {
     initializePricingToggle();
 });
+
