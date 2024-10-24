@@ -1,9 +1,0 @@
-Hotel Name: bruh
-Email: rasheed3086@gmail.com,,
-Country: Afghanistan,,
-Star Rating: 1
-Number of Rooms: 
-Amenities: 
-Description: 
-Policies: 
-Location: 

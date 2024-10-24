@@ -2,3 +2,5 @@ node_modules
 clone_asst_*
 deploy2.js
 temp_empty_service
+hotel_data
+orders.json

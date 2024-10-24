@@ -1,9 +1,0 @@
-Hotel Name: asd
-Email: rasheed3086@gmail.com,,
-Country: Afghanistan,,
-Star Rating: undefined
-Number of Rooms: 
-Amenities: dsa
-Description: 
-Policies: 
-Location: 
