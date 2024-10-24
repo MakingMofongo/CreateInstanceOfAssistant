@@ -1,0 +1,9 @@
+Hotel Name: baba
+Email: ,,
+Country: ,,
+Star Rating: undefined
+Number of Rooms: 
+Amenities: 
+Description: 
+Policies: 
+Location: 

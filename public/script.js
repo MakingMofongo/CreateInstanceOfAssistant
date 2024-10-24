@@ -8,6 +8,9 @@ let userClosedPrompt = false;
 let selectedPlan = null;
 let selectedAmount = 0;
 
+// Add this near the top of your script.js file
+let eventSource = null;
+
 document.getElementById('createBotForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -777,3 +780,103 @@ document.addEventListener('DOMContentLoaded', () => {
     initializePricingToggle();
 });
 
+// Update your form submission handler
+document.getElementById('createBotForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    // Show deployment progress
+    const deploymentProgress = document.querySelector('.deployment-progress');
+    deploymentProgress.style.display = 'block';
+    
+    // Get form data and submit as before
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch('/create-bot', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error('Failed to create bot');
+        
+        const { requestId } = await response.json();
+        
+        // Connect to SSE endpoint
+        connectToEventSource(requestId);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to create bot: ' + error.message);
+    }
+});
+
+function connectToEventSource(requestId) {
+    if (eventSource) {
+        eventSource.close();
+    }
+
+    eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
+    
+    eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        updateProgress(data);
+    };
+    
+    eventSource.onerror = (error) => {
+        console.error('EventSource failed:', error);
+        eventSource.close();
+    };
+}
+
+function updateProgress(data) {
+    const progressFill = document.querySelector('.progress-fill');
+    const progressStep = document.querySelector('.progress-step');
+    
+    if (data.error) {
+        progressStep.textContent = `Error: ${data.error}`;
+        progressStep.style.color = 'red';
+        return;
+    }
+
+    if (data.status === 'completed') {
+        progressFill.style.width = '100%';
+        progressStep.textContent = 'Deployment Complete!';
+        
+        // Display completion details
+        const completionDetails = document.getElementById('completion-details');
+        completionDetails.innerHTML = `
+            <div class="completion-info">
+                <p><strong>Phone Number:</strong> ${data.phoneNumber}</p>
+                <p><strong>Service URL:</strong> ${data.serviceUrl}</p>
+                <p><strong>Username:</strong> ${data.username}</p>
+                <p><strong>Password:</strong> ${data.password}</p>
+            </div>
+        `;
+        
+        // Move to the completion step
+        showStep(3);
+        
+        // Close the EventSource
+        if (eventSource) {
+            eventSource.close();
+        }
+        
+        return;
+    }
+
+    // Update progress bar and step text
+    if (data.progress !== undefined) {
+        progressFill.style.width = `${data.progress}%`;
+    }
+    
+    if (data.status) {
+        let statusText = data.status;
+        if (data.substep) {
+            statusText += ` - ${data.substep}`;
+        }
+        progressStep.textContent = statusText;
+    }
+}

@@ -6,17 +6,32 @@ function handleAuth(endpoint) {
         const name = document.getElementById('name')?.value;
 
         try {
-            const response = await fetch(`/api/${endpoint}`, {
+            // Check if we're in mock mode
+            const response = await fetch('/api/check-mock');
+            const { isMock } = await response.json();
+
+            if (isMock) {
+                // In mock mode, use test credentials
+                localStorage.setItem('token', 'mock_token');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Regular authentication flow
+            const authResponse = await fetch(`/api/${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password })
             });
 
-            if (!response.ok) throw new Error('Authentication failed');
+            if (!authResponse.ok) {
+                const error = await authResponse.json();
+                throw new Error(error.message || 'Authentication failed');
+            }
 
-            const { token } = await response.json();
+            const { token } = await authResponse.json();
             localStorage.setItem('token', token);
-            window.location.href = 'index.html'; // Redirect to main page
+            window.location.href = 'index.html';
         } catch (error) {
             alert(error.message);
         }

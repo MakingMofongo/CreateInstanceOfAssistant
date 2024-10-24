@@ -459,5 +459,14 @@
     <!-- Remove the user-bar.js script if it's no longer needed -->
     <!-- <script src="user-bar.js"></script> -->
     <script src="deployed-bots.js"></script>
+    <!-- Add this script right before the closing </body> tag -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (!token && process.env.IS_MOCK !== 'true') {
+                window.location.href = 'login.html';
+            }
+        });
+    </script>
 </body>
 </html>

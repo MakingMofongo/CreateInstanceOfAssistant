@@ -117,10 +117,14 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt for user:', email);
 
-    // Check for test user
-    if (email === 'test@gmail.com' && password === 'test') {
+    // Check for test user or mock mode
+    if ((email === 'test@gmail.com' && password === 'test') || process.env.IS_MOCK === 'true') {
       console.log('Test user login successful');
-      const testUser = { _id: 'test_user_id', email: 'test@gmail.com' };
+      const testUser = { 
+        _id: 'test_user_id', 
+        email: 'test@gmail.com',
+        name: 'Test User'
+      };
       const token = jwt.sign({ id: testUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
       return res.json({ token });
     }
@@ -697,4 +701,22 @@ app.get('/test-json', (req, res) => {
 
 app.get('/payment-success', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'success.html'));
+});
+
+// Add this new endpoint near the other API routes
+app.get('/api/check-mock', (req, res) => {
+    res.json({ isMock: process.env.IS_MOCK === 'true' });
+});
+
+// Update the protect middleware usage to check for mock mode
+app.use((req, res, next) => {
+    if (process.env.IS_MOCK === 'true') {
+        req.user = {
+            _id: 'test_user_id',
+            email: 'test@gmail.com',
+            name: 'Test User'
+        };
+        return next();
+    }
+    next();
 });

@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h1>Login to KOKO AI</h1>
+        <div id="mock-notice" style="display: none;" class="notice">
+            System is in mock mode. You will be automatically logged in.
+            <br>
+            Redirecting to main page...
+        </div>
         <form id="loginForm">
             <input type="email" id="email" placeholder="Email" required>
             <input type="password" id="password" placeholder="Password" required>
@@ -16,6 +21,21 @@
         </form>
         <p>Don't have an account? <a href="signup.html">Sign up</a></p>
     </div>
+    <script>
+        // Check for mock mode on page load
+        fetch('/api/check-mock')
+            .then(response => response.json())
+            .then(data => {
+                if (data.isMock) {
+                    document.getElementById('mock-notice').style.display = 'block';
+                    document.getElementById('loginForm').style.display = 'none';
+                    localStorage.setItem('token', 'mock_token');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
+                }
+            });
+    </script>
     <script src="auth.js"></script>
 </body>
 </html>
