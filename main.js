@@ -16,6 +16,7 @@ const { updatePhoneNumber } = require('./Twilio_Number_Routing/change_existing_u
 const { exec } = require('child_process');
 const Razorpay = require('razorpay');
 const { validateWebhookSignature } = require('razorpay/dist/utils/razorpay-utils');
+const os = require('os');
 
 const app = express();
 app.use(express.json());
@@ -36,48 +37,55 @@ let lastDeploymentTime = 300000; // Default to 5 minutes
 // At the top of the file, add this constant
 const BOT_CREATION_TIMEOUT = 300000; // 5 minutes in milliseconds
 
-// Google Cloud Authentication
-function authenticateGoogleCloud() {
-  return new Promise((resolve, reject) => {
-    exec('gcloud auth activate-service-account --key-file=google_creds.json', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Google Cloud authentication error: ${error}`);
-        return reject(error);
-      }
-      console.log('Google Cloud authenticated successfully');
-      resolve();
-    });
-  });
-}
+// Add at the top with other constants
+const DISABLE_FAUX_TIMERS = process.env.DISABLE_FAUX_TIMERS === 'true';
 
-// Set Google Cloud project
+// Set Google Cloud project (keep this in main.js since it's not in deployment.js)
 function setGoogleCloudProject() {
-  return new Promise((resolve, reject) => {
-    exec('gcloud config set project canvas-replica-402316', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error setting Google Cloud project: ${error}`);
-        return reject(error);
-      }
-      console.log('Google Cloud project set successfully');
-      resolve();
+    return new Promise((resolve, reject) => {
+        const command = 'gcloud config set project canvas-replica-402316';
+        
+        console.log('Executing project set command:', command);
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error setting Google Cloud project: ${error}`);
+                return reject(error);
+            }
+            console.log('Google Cloud project set successfully');
+            resolve();
+        });
     });
-  });
 }
 
 // Initialize Google Cloud
 async function initializeGoogleCloud() {
-  if (!IS_MOCK) {
-    try {
-      await authenticateGoogleCloud();
-      await setGoogleCloudProject();
-      console.log('Google Cloud initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize Google Cloud:', error);
-      process.exit(1);
+    if (!IS_MOCK) {
+        try {
+            // Check if google_creds.json exists
+            const keyFilePath = path.resolve(__dirname, 'google_creds.json');
+            if (!fs.existsSync(keyFilePath)) {
+                console.error('google_creds.json not found at:', keyFilePath);
+                throw new Error('Google credentials file not found');
+            }
+
+            // Use the full Windows path
+            const fullPath = keyFilePath.replace(/\\/g, '/');
+            console.log('Using credentials file:', fullPath);
+
+            const serviceAccountEmail = JSON.parse(fs.readFileSync(fullPath, 'utf8')).client_email;
+            console.log('Authenticating with service account:', serviceAccountEmail);
+
+            await authenticateServiceAccount(fullPath);
+            await setGoogleCloudProject();
+            console.log('Google Cloud initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize Google Cloud:', error);
+            throw error;
+        }
+    } else {
+        console.log('Mock mode: Skipping Google Cloud initialization');
     }
-  } else {
-    console.log('Mock mode: Skipping Google Cloud initialization');
-  }
 }
 
 // MongoDB Connection
@@ -117,16 +125,33 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Login attempt for user:', email);
 
-    // Check for test user or mock mode
-    if ((email === 'test@gmail.com' && password === 'test') || process.env.IS_MOCK === 'true') {
-      console.log('Test user login successful');
-      const testUser = { 
-        _id: 'test_user_id', 
-        email: 'test@gmail.com',
-        name: 'Test User'
-      };
-      const token = jwt.sign({ id: testUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-      return res.json({ token });
+    // Check session settings first
+    const sessionSettings = req.headers['x-session-settings'];
+    let isMockMode = process.env.IS_MOCK === 'true';
+
+    if (sessionSettings) {
+      try {
+        const settings = JSON.parse(sessionSettings);
+        if (settings.isActive) {
+          isMockMode = settings.IS_MOCK;
+        }
+      } catch (error) {
+        console.error('Error parsing session settings:', error);
+      }
+    }
+
+    // If mock mode is enabled (either globally or in session)
+    if (isMockMode) {
+      if (email === 'test@gmail.com' && password === 'test') {
+        console.log('Test user login successful (mock mode)');
+        const testUser = { 
+          _id: 'test_user_id', 
+          email: 'test@gmail.com',
+          name: 'Test User'
+        };
+        const token = jwt.sign({ id: testUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+        return res.json({ token });
+      }
     }
 
     // Regular user authentication
@@ -144,92 +169,172 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Protected route for creating bots
+// Update the create-bot POST endpoint
 app.post('/create-bot', protect, upload.single('additionalInfo'), async (req, res) => {
-  const requestId = generateRandomString();
-  botCreationProgress.set(requestId, { 
-    sendUpdate: (data) => console.log(`Update for ${requestId}:`, data)
-  });
-  res.json({ requestId });
-
-  try {
-    console.log('Attempting to create bot for user:', req.user._id);
-    console.log('Request body:', req.body);
+    const requestId = generateRandomString();
+    console.log('New bot creation request received. RequestId:', requestId, 'User:', req.user._id);
     
-    const { botType } = req.body;
-    let serviceName, name, finalPrompt;
-
-    if (botType === 'Hotel') {
-      serviceName = req.body.hotelName;
-      name = req.body.hotelName;
-      finalPrompt = generateHotelPrompt(req.body);
-    } else if (botType === 'Hospital') {
-      serviceName = req.body.hospitalName;
-      name = req.body.hospitalName;
-      finalPrompt = generateHospitalPrompt(req.body);
-    } else if (botType === 'Custom') {
-      serviceName = req.body.assistantName;
-      name = req.body.assistantName;
-      finalPrompt = req.body.customPrompt || generateCustomPrompt(req.body);
-    } else {
-      throw new Error('Invalid bot type');
-    }
-
-    if (!serviceName || serviceName.trim() === '') {
-      throw new Error('Service name is required');
-    }
-
-    console.log('Bot details:', { serviceName, name, botType });
-
-    // Handle file upload and parsing
-    let additionalInfo = '';
-    if (req.file) {
-      const filePath = path.join(__dirname, req.file.path);
-      additionalInfo = await parseUploadedFile(filePath);
-      fs.unlinkSync(filePath); // Delete the temporary file after parsing
-    }
-
-    const botCreationResult = await processBotCreation(requestId, { 
-      serviceName, 
-      name, 
-      formData: req.body,
-      finalPrompt,
-      additionalInfo,
-      botType,
-      userId: req.user._id
+    // Store session settings and create sendUpdate function
+    const sessionSettings = req.headers['x-session-settings'];
+    console.log('Received session settings:', sessionSettings);
+    
+    // Store the auth token along with other data
+    const progressObject = { 
+        sessionSettings: sessionSettings ? JSON.parse(sessionSettings) : null,
+        authToken: req.headers.authorization, // Store the auth token
+        sendUpdate: (data) => {
+            console.log('Warning: sendUpdate called before SSE connection established');
+        },
+        isConnected: false // Add connection status flag
+    };
+    console.log('Created progress object:', {
+        ...progressObject,
+        authToken: progressObject.authToken ? 'present' : 'missing'
     });
+    
+    botCreationProgress.set(requestId, progressObject);
+    
+    // Send initial response with requestId
+    console.log('Sending initial response with requestId:', requestId);
+    res.json({ requestId });
 
-    console.log('Bot creation result:', botCreationResult);
+    try {
+        // Log the form data we received
+        console.log('Form data received:', {
+            serviceName: req.body.serviceName,
+            name: req.body.name,
+            botType: req.body.botType,
+            hasFile: !!req.file
+        });
 
-    // After successful creation, save the bot to the database
-    const bot = new Bot({
-      user: req.user._id,
-      name: serviceName,
-      type: botType,
-      assistantId: botCreationResult.assistant.id,
-      phoneNumber: botCreationResult.phoneNumberInfo.phoneNumber,
-      serviceUrl: botCreationResult.clonedServiceResult.serviceUrl,
-      username: botCreationResult.deployedUsername,
-      password: botCreationResult.deployedPassword
-    });
-    await bot.save();
-    console.log('Bot saved to database:', bot._id);
+        // Wait for SSE connection to be established
+        console.log('Waiting for SSE connection...');
+        await new Promise((resolve, reject) => {
+            const maxWaitTime = 5000; // 5 seconds timeout
+            const checkInterval = 100; // Check every 100ms
+            let totalWaitTime = 0;
 
-    // Keep the sendUpdate function alive for a while after completion
-    setTimeout(() => {
-      botCreationProgress.delete(requestId);
-    }, 300000); // 5 minutes
+            const checkConnection = setInterval(() => {
+                const progress = botCreationProgress.get(requestId);
+                if (progress?.isConnected) {
+                    clearInterval(checkConnection);
+                    resolve();
+                } else if (totalWaitTime >= maxWaitTime) {
+                    clearInterval(checkConnection);
+                    reject(new Error('Timeout waiting for SSE connection'));
+                }
+                totalWaitTime += checkInterval;
+            }, checkInterval);
+        });
 
-  } catch (error) {
-    console.error('Error creating bot:', error);
+        console.log('SSE connection established, starting bot creation...');
+
+        // Process the bot creation with user ID
+        const result = await processBotCreation(requestId, {
+            serviceName: req.body.serviceName,
+            name: req.body.name,
+            formData: req.body,
+            finalPrompt: req.body.finalPrompt,
+            additionalInfo: req.file ? fs.readFileSync(req.file.path, 'utf8') : null,
+            botType: req.body.botType,
+            userId: req.user._id  // Pass the user ID
+        });
+
+        console.log('Bot creation completed successfully:', result);
+    } catch (error) {
+        console.error('Error in bot creation:', error);
+        const progress = botCreationProgress.get(requestId);
+        if (progress && typeof progress.sendUpdate === 'function') {
+            progress.sendUpdate({ 
+                error: 'Failed to create bot: ' + error.message,
+                stack: error.stack
+            });
+        }
+    } finally {
+        // Clean up file if it exists
+        if (req.file) {
+            console.log('Cleaning up uploaded file');
+            fs.unlinkSync(req.file.path);
+        }
+    }
+});
+
+// Update the SSE endpoint
+app.get('/create-bot', async (req, res) => {
+    const requestId = req.query.requestId;
+    const token = req.query.token;
+    
+    console.log('SSE connection request for requestId:', requestId, 'token:', token ? 'present' : 'missing');
+    
+    if (!requestId) {
+        console.error('Missing requestId in SSE request');
+        return res.status(400).send('Missing requestId');
+    }
+
+    // Get the progress object
     const progress = botCreationProgress.get(requestId);
-    if (progress && typeof progress.sendUpdate === 'function') {
-      progress.sendUpdate({ error: 'Failed to create bot: ' + error.message });
-    } else {
-      console.warn(`No sendUpdate function found for requestId: ${requestId}`);
+    if (!progress) {
+        console.error('No progress object found for requestId:', requestId);
+        return res.status(404).send('No progress found for this requestId');
     }
-    botCreationProgress.delete(requestId);
-  }
+
+    // Use stored token if query token is missing
+    const authToken = token || progress.authToken?.split(' ')[1];
+    if (!authToken) {
+        console.error('No token provided in request or stored progress');
+        return res.status(401).send('Not authorized');
+    }
+
+    // Verify token
+    try {
+        const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id);
+        if (!user) {
+            throw new Error('User not found');
+        }
+        req.user = user;
+    } catch (error) {
+        console.error('Authentication failed:', error);
+        return res.status(401).send('Not authorized');
+    }
+
+    // Set SSE headers
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    });
+
+    // Create sendUpdate function
+    const sendUpdate = (data) => {
+        try {
+            console.log('Sending SSE update:', data);
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+        } catch (error) {
+            console.error('Error sending SSE update:', error);
+        }
+    };
+
+    // Update the progress object
+    progress.sendUpdate = sendUpdate;
+    progress.isConnected = true;
+    botCreationProgress.set(requestId, progress);
+
+    // Send initial connection message
+    sendUpdate({ status: 'Connected', progress: 0 });
+
+    // Handle client disconnect
+    res.on('close', () => {
+        console.log(`Client disconnected from SSE for requestId: ${requestId}`);
+        const currentProgress = botCreationProgress.get(requestId);
+        if (currentProgress) {
+            currentProgress.isConnected = false;
+            if (!currentProgress.finalData) {
+                console.log('Cleaning up progress data for requestId:', requestId);
+                botCreationProgress.delete(requestId);
+            }
+        }
+    });
 });
 
 // Retrieve user's bots
@@ -302,14 +407,19 @@ app.post('/change-hilton-url', async (req, res) => {
 
 // Initialize the application
 async function startServer() {
-  await initializeGoogleCloud();
+    try {
+        await initializeGoogleCloud();
 
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-    console.log('Environment:', process.env.NODE_ENV || 'development');
-    console.log('MongoDB URI:', process.env.MONGODB_URI.replace(/\/\/.*@/, '//<credentials>@')); // Hide credentials in logs
-  });
+        const port = process.env.PORT || 3000;
+        app.listen(port, () => {
+            console.log(`Server is running on port ${port}`);
+            console.log('Environment:', process.env.NODE_ENV || 'development');
+            console.log('MongoDB URI:', process.env.MONGODB_URI.replace(/\/\/.*@/, '//<credentials>@'));
+        });
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
 }
 
 startServer();
@@ -333,7 +443,7 @@ Start by asking the caller's name, and good luck!`;
 function generateHospitalPrompt(data) {
   return `You are the AI receptionist for ${data.hospitalName}, fluent in every language. Maintain a ${data.hospitalTone || 'compassionate and professional'} tone, ensuring clear and concise communication.
 
-Do not provide medical advice—refer to professionals when necessary. Ensure all interactions are respectful and adhere to patient privacy guidelines.
+Do not provide medical advicerefer to professionals when necessary. Ensure all interactions are respectful and adhere to patient privacy guidelines.
 
 Begin by greeting the caller and asking how you can assist them today.`;
 }
@@ -350,208 +460,226 @@ Start by introducing yourself and asking how you can help today.`;
 }
 
 function generateKnowledgeBaseContent(data, botType, additionalInfo) {
-  let content = '';
-  if (botType === 'Hotel') {
-    content += `Hotel Name: ${data.hotelName}\n`;
-    content += `Email: ${data.email}\n`;
-    content += `Country: ${data.country}\n`;
-    content += `Star Rating: ${data.hotelStars}\n`;
-    content += `Number of Rooms: ${data.hotelRooms}\n`;
-    content += `Amenities: ${data.hotelAmenities}\n`;
-    content += `Description: ${data.hotelDescription}\n`;
-    content += `Policies: ${data.hotelPolicies}\n`;
-    content += `Location: ${data.hotelLocation}\n`;
-  } else if (botType === 'Hospital') {
-    content += `Hospital Name: ${data.hospitalName}\n`;
-    content += `Email: ${data.email}\n`;
-    content += `Country: ${data.country}\n`;
-    content += `Hospital Type: ${data.hospitalType}\n`;
-    content += `Departments: ${data.hospitalDepartments}\n`;
-    content += `Number of Beds: ${data.hospitalBeds}\n`;
-    content += `Description: ${data.hospitalDescription}\n`;
-    content += `Services: ${data.hospitalServices}\n`;
-    content += `Location: ${data.hospitalLocation}\n`;
-  } else if (botType === 'Custom') {
-    content += `Assistant Name: ${data.assistantName}\n`;
-    content += `Email: ${data.email}\n`;
-    content += `Country: ${data.country}\n`;
-    content += `Industry: ${data.customIndustry}\n`;
-    content += `Purpose: ${data.customPurpose}\n`;
-    content += `Tone: ${data.customTone}\n`;
-    content += `Knowledge Base: ${data.customKnowledgeBase}\n`;
-    content += `Guidelines: ${data.customGuidelines}\n`;
-  }
+    let content = '';
+    if (botType === 'Hotel') {
+        content += `Hotel Name: ${data.hotelName}\n`;
+        content += `Email: ${data.email}\n`;
+        content += `Country: ${data.country}\n`;  // Fixed: Added backticks
+        content += `Star Rating: ${data.hotelStars}\n`;
+        content += `Number of Rooms: ${data.hotelRooms}\n`;
+        content += `Amenities: ${data.hotelAmenities}\n`;
+        content += `Description: ${data.hotelDescription}\n`;
+        content += `Policies: ${data.hotelPolicies}\n`;
+        content += `Location: ${data.hotelLocation}\n`;
+    } else if (botType === 'Hospital') {
+        content += `Hospital Name: ${data.hospitalName}\n`;
+        content += `Email: ${data.email}\n`;
+        content += `Country: ${data.country}\n`;  // Fixed: Added backticks
+        content += `Hospital Type: ${data.hospitalType}\n`;
+        content += `Departments: ${data.hospitalDepartments}\n`;
+        content += `Number of Beds: ${data.hospitalBeds}\n`;
+        content += `Description: ${data.hospitalDescription}\n`;
+        content += `Services: ${data.hospitalServices}\n`;
+        content += `Location: ${data.hospitalLocation}\n`;
+    } else if (botType === 'Custom') {
+        content += `Assistant Name: ${data.assistantName}\n`;
+        content += `Email: ${data.email}\n`;
+        content += `Country: ${data.country}\n`;  // Fixed: Added backticks
+        content += `Industry: ${data.customIndustry}\n`;  // Fixed: Added backticks
+        content += `Purpose: ${data.customPurpose}\n`;  // Fixed: Added backticks
+        content += `Tone: ${data.customTone}\n`;  // Fixed: Added backticks
+        content += `Knowledge Base: ${data.customKnowledgeBase}\n`;  // Fixed: Added backticks
+        content += `Guidelines: ${data.customGuidelines}\n`;  // Fixed: Added backticks
+    }
 
-  // Append additional info from uploaded file
-  if (additionalInfo) {
-    content += '\nAdditional Information:\n' + additionalInfo;
-  }
+    // Append additional info from uploaded file
+    if (additionalInfo) {
+        content += '\nAdditional Information:\n' + additionalInfo;
+    }
 
-  return content;
+    return content;
 }
 
+// Update the simulateProgress function to accept settings parameter
+async function simulateProgress(sendUpdate, status, duration, settings) {
+    // Use passed settings instead of trying to access req
+    if (settings?.DISABLE_FAUX_TIMERS) {
+        // If faux timers are disabled, just send 0% and 100%
+        sendUpdate({ status, progress: 0 });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        sendUpdate({ status, progress: 100 });
+        return;
+    }
+
+    // Regular faux timer behavior
+    const steps = 10;
+    const stepDuration = Math.floor(duration / steps);
+    
+    for (let i = 1; i <= steps; i++) {
+        await new Promise(resolve => setTimeout(resolve, stepDuration));
+        const progress = Math.round((i / steps) * 100);
+        sendUpdate({ status, progress });
+    }
+}
+
+// Update processBotCreation to properly handle settings
 async function processBotCreation(requestId, { serviceName, name, formData, finalPrompt, additionalInfo, botType, userId }) {
-  const sendUpdate = (data) => {
     const progress = botCreationProgress.get(requestId);
-    if (progress && typeof progress.sendUpdate === 'function') {
-      try {
-        // Stringify the data, but limit its size
-        const stringifiedData = JSON.stringify(data, (key, value) => {
-          if (typeof value === 'object' && value !== null) {
-            return Object.keys(value).reduce((acc, k) => {
-              acc[k] = value[k];
-              return acc;
-            }, {});
-          }
-          return value;
-        }, 2).slice(0, 1000000); // Limit to 1MB
-        progress.sendUpdate(JSON.parse(stringifiedData));
-      } catch (error) {
-        console.error('Error sending update:', error);
-      }
-    } else {
-      console.warn(`No sendUpdate function found for requestId: ${requestId}`);
-    }
-  };
-
-  try {
-    console.log('Starting bot creation process for user:', userId);
-    const { username, password } = generateCredentials();
-
-    const startTime = Date.now();
-
-    const deploymentPromise = (async () => {
-      // Save all form data and additional info to the text file
-      const fileName = `${serviceName.replace(/\s+/g, '_').toLowerCase()}_data.txt`;
-      const filePath = path.join(__dirname, 'hotel_data', fileName);
-      const fileContent = generateKnowledgeBaseContent(formData, botType, additionalInfo);
-      fs.writeFileSync(filePath, fileContent, 'utf8');
-
-      // Step 1: Create a new Assistant with File Search Enabled
-      const assistant = await openai.beta.assistants.create({
-        name: name,
-        instructions: finalPrompt,
-        model: "gpt-4o",
-        tools: [{ type: "file_search" }],
-      });
-
-      // Step 2: Upload files and add them to a Vector Store
-      const fileStream = fs.createReadStream(filePath);
-      const vectorStore = await openai.beta.vectorStores.create({
-        name: `${serviceName}_VectorStore`,
-      });
-      
-      await openai.beta.vectorStores.fileBatches.uploadAndPoll(vectorStore.id, {
-        files: [fileStream],
-      });
-
-      // Step 3: Update the assistant to use the new Vector Store
-      await openai.beta.assistants.update(assistant.id, {
-        tool_resources: { file_search: { vector_store_ids: [vectorStore.id] } },
-      });
-
-      const randomSuffix = generateRandomString();
-      
-      // Use the assistant.id for the actual deployment
-      const deploymentName = IS_MOCK ? `tester-${randomSuffix}` : `${assistant.id}-${randomSuffix}`;
-      
-      sendUpdate({ status: 'Deployment', progress: 10 });
-      const emptyServiceResult = await deployment(deploymentName, null, randomSuffix);
-      if (!emptyServiceResult.serviceUrl) throw new Error('Failed to obtain service URL from empty deployment');
-      
-      sendUpdate({ status: 'Deployment', progress: 40 });
-      const cloneResult = clone(assistant.id, emptyServiceResult.serviceUrl);
-      
-      sendUpdate({ status: 'Deployment', progress: 70 });
-      const clonedServiceResult = await deployment(deploymentName, cloneResult.folderName, randomSuffix);
-      if (!clonedServiceResult.serviceUrl) throw new Error('Failed to obtain service URL from cloned deployment');
-      
-      sendUpdate({ status: 'Deployment', progress: 100 });
-      return { clonedServiceResult, assistant, username: cloneResult.username, password: cloneResult.password };
-    })();
-
-    const steps = ['Initializing', 'Creating Knowledge Base', 'Training AI', 'Cloud Setup', 'Deployment', 'Phone Configuration'];
-    const baseTimings = [10000, 20000, 30000, 20000, 300000, 10000];
-    const adjustedDurations = baseTimings.map(timing => Math.round(timing * (lastDeploymentTime / 300000)));
-
-    for (let i = 0; i < steps.length; i++) {
-      sendUpdate({ status: steps[i], progress: 0 });
-      try {
-        if (i === steps.length - 2) { // Deployment step
-          deploymentEmitter.on('progress', (data) => {
-            sendUpdate({ status: 'Deployment', progress: data.progress, substep: data.step });
-          });
-
-          // Wait for the actual deployment to complete
-          const deploymentResult = await deploymentPromise;
-
-          // Deployment completed successfully
-          sendUpdate({ status: 'Deployment', progress: 100, substep: 'Completed' });
-        } else {
-          await simulateProgress(sendUpdate, steps[i], adjustedDurations[i]);
-        }
-      } catch (error) {
-        console.error(`Error in ${steps[i]} step:`, error);
-        sendUpdate({ error: `An error occurred during the ${steps[i]} step: ${error.message}. Please check server logs.` });
-        throw error; // Re-throw to stop the process
-      }
-    }
-
-    const endTime = Date.now();
-    lastDeploymentTime = endTime - startTime;
-    console.log(`Deployment completed in ${lastDeploymentTime}ms`);
-
-    const { clonedServiceResult, assistant, username: deployedUsername, password: deployedPassword } = await deploymentPromise;
-
-    sendUpdate({ status: 'Phone Configuration', progress: 0 });
-    let phoneNumberInfo;
+    const sendUpdate = progress?.sendUpdate;
+    
     try {
-      phoneNumberInfo = await updatePhoneNumber(clonedServiceResult.serviceUrl);
-      await simulateProgress(sendUpdate, 'Phone Configuration', IS_MOCK ? 2000 : 10000);
+        // Get session settings from the progress object
+        let effectiveSettings = {
+            IS_MOCK: process.env.IS_MOCK === 'true',
+            DISABLE_FAUX_TIMERS: process.env.DISABLE_FAUX_TIMERS === 'true'
+        };
+
+        if (progress && progress.sessionSettings) {
+            try {
+                const settings = JSON.parse(progress.sessionSettings);
+                if (settings.isActive) {
+                    // Session settings override global settings
+                    effectiveSettings = {
+                        IS_MOCK: settings.IS_MOCK,
+                        DISABLE_FAUX_TIMERS: settings.DISABLE_FAUX_TIMERS
+                    };
+                    console.log('Using session settings for deployment:', effectiveSettings);
+                }
+            } catch (error) {
+                console.error('Error parsing session settings:', error);
+            }
+        }
+
+        console.log('Final effective settings for deployment:', effectiveSettings);
+
+        // Create mock assistant data only if mock mode is enabled
+        let assistant;
+        if (effectiveSettings.IS_MOCK) {
+            assistant = {
+                id: 'mock_asst_' + Math.random().toString(36).substring(7),
+                name: name,
+                instructions: finalPrompt
+            };
+            console.log('Created mock assistant:', assistant);
+        } else {
+            // Create real OpenAI assistant
+            console.log('Creating real OpenAI assistant...');
+            assistant = await openai.beta.assistants.create({
+                name: name,
+                instructions: finalPrompt,
+                model: "gpt-4o",
+                tools: [{ type: "file_search" }],
+            });
+            console.log('Created real assistant:', assistant);
+        }
+
+        // Initializing
+        sendUpdate({ status: 'Initializing', progress: 0 });
+        await simulateProgress(sendUpdate, 'Initializing', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
+        sendUpdate({ status: 'Initializing', progress: 100 });
+
+        // Creating Knowledge Base
+        sendUpdate({ status: 'Creating Knowledge Base', progress: 0 });
+        await simulateProgress(sendUpdate, 'Creating Knowledge Base', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
+        sendUpdate({ status: 'Creating Knowledge Base', progress: 100 });
+
+        // Training AI
+        sendUpdate({ status: 'Training AI', progress: 0 });
+        await simulateProgress(sendUpdate, 'Training AI', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
+        sendUpdate({ status: 'Training AI', progress: 100 });
+
+        // Cloud Setup
+        sendUpdate({ status: 'Cloud Setup', progress: 0 });
+        await simulateProgress(sendUpdate, 'Cloud Setup', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
+        
+        const randomSuffix = generateRandomString();
+        const deploymentName = effectiveSettings.IS_MOCK ? `tester-${randomSuffix}` : `${assistant.id}-${randomSuffix}`;
+        
+        sendUpdate({ status: 'Cloud Setup', progress: 100 });
+
+        // Deployment
+        sendUpdate({ status: 'Deployment', progress: 0 });
+        
+        if (effectiveSettings.IS_MOCK) {
+            // Mock deployment process
+            await simulateProgress(sendUpdate, 'Deployment', 1000, effectiveSettings);
+            const mockServiceUrl = `https://mock-service-${randomSuffix}.run.app`;
+            const mockCredentials = {
+                username: 'mock_user_' + Math.random().toString(36).substring(7),
+                password: 'mock_pass_' + Math.random().toString(36).substring(7)
+            };
+            
+            sendUpdate({ status: 'Deployment', progress: 100 });
+            
+            // Send completion with mock data
+            sendUpdate({ 
+                status: 'completed',
+                serviceUrl: mockServiceUrl,
+                phoneNumber: '+13394997114',
+                username: mockCredentials.username,
+                password: mockCredentials.password
+            });
+
+            return {
+                clonedServiceResult: { serviceUrl: mockServiceUrl },
+                assistant,
+                deployedUsername: mockCredentials.username,
+                deployedPassword: mockCredentials.password
+            };
+        } else {
+            console.log('Starting real deployment process...');
+            // Real deployment process
+            const emptyServiceResult = await deployment(deploymentName, null, randomSuffix, effectiveSettings);
+            sendUpdate({ status: 'Deployment', progress: 33 });
+            console.log('Empty service deployed:', emptyServiceResult);
+
+            if (!emptyServiceResult.serviceUrl) {
+                throw new Error('Failed to get service URL from empty deployment');
+            }
+
+            // First clone the assistant
+            const cloneResult = await clone(assistant.id, emptyServiceResult.serviceUrl);
+            sendUpdate({ status: 'Deployment', progress: 66 });
+            console.log('Clone result:', cloneResult);
+
+            // Then deploy the cloned folder
+            const clonedServiceResult = await deployment(
+                assistant.id,
+                cloneResult.folderName,
+                randomSuffix,
+                effectiveSettings
+            );
+
+            if (!clonedServiceResult.serviceUrl) {
+                throw new Error('Failed to get service URL from final deployment');
+            }
+
+            sendUpdate({ status: 'Deployment', progress: 100 });
+            console.log('Final deployment result:', clonedServiceResult);
+
+            // Send completion status with all required information
+            const completionData = {
+                status: 'completed',
+                serviceUrl: clonedServiceResult.serviceUrl,
+                phoneNumber: '+13394997114',
+                username: cloneResult.username,
+                password: cloneResult.password
+            };
+
+            console.log('Sending completion data:', completionData);
+            sendUpdate(completionData);
+
+            return {
+                clonedServiceResult,
+                assistant,
+                deployedUsername: cloneResult.username,
+                deployedPassword: cloneResult.password
+            };
+        }
     } catch (error) {
-      console.error('Error in phone configuration:', error);
-      phoneNumberInfo = { phoneNumber: 'Configuration failed. Please contact support.' };
+        console.error('Error in processBotCreation:', error);
+        throw error;
     }
-
-    const finalData = {
-      status: 'completed',
-      message: 'Your AI receptionist is ready!',
-      assistantId: assistant.id,
-      phoneNumber: phoneNumberInfo.phoneNumber,
-      serviceUrl: clonedServiceResult.serviceUrl,
-      username: deployedUsername,
-      password: deployedPassword
-    };
-
-    sendUpdate(finalData);
-
-    // Store the final data and set a timeout to remove it
-    botCreationProgress.set(requestId, { 
-      ...botCreationProgress.get(requestId), 
-      finalData,
-      sendUpdate // Keep the sendUpdate function
-    });
-
-    setTimeout(() => {
-      botCreationProgress.delete(requestId);
-    }, BOT_CREATION_TIMEOUT);
-
-    return { clonedServiceResult, assistant, deployedUsername, deployedPassword, phoneNumberInfo };
-
-  } catch (error) {
-    console.error('Error in processBotCreation:', error);
-    sendUpdate({ error: 'An error occurred while creating your AI receptionist. Please check server logs.' });
-    throw error;
-  }
-}
-
-async function simulateProgress(sendUpdate, status, duration) {
-  const steps = 20;
-  const stepDuration = duration / steps;
-  for (let i = 1; i <= steps; i++) {
-    await new Promise(resolve => setTimeout(resolve, stepDuration));
-    sendUpdate({ status, progress: (i / steps) * 100 });
-  }
 }
 
 // New function to parse uploaded files
@@ -624,13 +752,53 @@ if (!fs.existsSync('orders.json')) {
     writeData([]);
 }
 
-// Route to handle order creation
+// Update the create-order endpoint
 app.post('/create-order', async (req, res) => {
     console.log('Received create-order request');
     try {
         const { amount, currency, receipt, notes } = req.body;
         console.log('Request body:', { amount, currency, receipt, notes });
 
+        // Check session settings first
+        const sessionSettings = req.headers['x-session-settings'];
+        let skipPayment = false;
+
+        if (sessionSettings) {
+            try {
+                const settings = JSON.parse(sessionSettings);
+                if (settings.isActive) {
+                    skipPayment = Boolean(settings.SKIP_PAYMENT);
+                    console.log('Using session settings for skip payment:', skipPayment);
+                }
+            } catch (error) {
+                console.error('Error parsing session settings:', error);
+            }
+        }
+
+        // Fall back to global settings if no session settings
+        if (!sessionSettings) {
+            skipPayment = process.env.SKIP_PAYMENT === 'true';
+            console.log('Using global settings for skip payment:', skipPayment);
+        }
+
+        console.log('Final skip payment value:', skipPayment);
+
+        if (skipPayment) {
+            console.log('Payment skipped - creating mock order');
+            const mockOrder = {
+                id: 'mock_order_' + Date.now(),
+                amount: amount,
+                currency: currency,
+                receipt: receipt,
+                status: 'created',
+                mock: true
+            };
+            console.log('Created mock order:', mockOrder);
+            return res.json(mockOrder);
+        }
+
+        // Regular Razorpay order creation
+        console.log('Creating real Razorpay order');
         if (!amount || !currency || !receipt) {
             console.log('Missing required fields');
             return res.status(400).json({ message: 'Missing required fields' });
@@ -660,7 +828,7 @@ app.post('/create-order', async (req, res) => {
 
         res.json(order);
     } catch (error) {
-        console.error('Error creating Razorpay order:', error);
+        console.error('Error creating order:', error);
         res.status(500).json({ message: 'Error creating order', error: error.message });
     }
 });
@@ -669,6 +837,22 @@ app.post('/create-order', async (req, res) => {
 app.post('/verify-payment', (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
+    // Check if we're in mock mode
+    if (process.env.SKIP_PAYMENT === 'true') {
+        // For mock payments, always verify as successful
+        const orders = readData();
+        const order = orders.find(o => o.order_id === razorpay_order_id);
+        if (order) {
+            order.status = 'paid';
+            order.payment_id = razorpay_payment_id;
+            writeData(orders);
+        }
+        res.status(200).json({ status: 'ok' });
+        console.log("Mock payment verification successful");
+        return;
+    }
+
+    // Real Razorpay verification
     const secret = razorpay.key_secret;
     const body = razorpay_order_id + '|' + razorpay_payment_id;
 
@@ -710,7 +894,22 @@ app.get('/api/check-mock', (req, res) => {
 
 // Update the protect middleware usage to check for mock mode
 app.use((req, res, next) => {
-    if (process.env.IS_MOCK === 'true') {
+    // Check session settings first
+    const sessionSettings = req.headers['x-session-settings'];
+    let isMockMode = process.env.IS_MOCK === 'true';
+
+    if (sessionSettings) {
+        try {
+            const settings = JSON.parse(sessionSettings);
+            if (settings.isActive) {
+                isMockMode = settings.IS_MOCK;
+            }
+        } catch (error) {
+            console.error('Error parsing session settings:', error);
+        }
+    }
+
+    if (isMockMode) {
         req.user = {
             _id: 'test_user_id',
             email: 'test@gmail.com',
@@ -720,3 +919,136 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// Add this new endpoint near the other API routes
+app.get('/api/check-payment-mode', (req, res) => {
+    res.json({ skipPayment: process.env.SKIP_PAYMENT === 'true' });
+});
+
+// Update the middleware that handles settings
+app.use(async (req, res, next) => {
+    try {
+        // First check session settings in headers
+        const sessionSettings = req.headers['x-session-settings'];
+        if (sessionSettings) {
+            try {
+                const settings = JSON.parse(sessionSettings);
+                if (settings.isActive) {
+                    // Use session settings exclusively if they exist
+                    req.effectiveSettings = {
+                        IS_MOCK: Boolean(settings.IS_MOCK),
+                        SKIP_PAYMENT: Boolean(settings.SKIP_PAYMENT),
+                        DISABLE_FAUX_TIMERS: Boolean(settings.DISABLE_FAUX_TIMERS)
+                    };
+                    // Only log on actual setting changes or important endpoints
+                    if (req.path.includes('/api/admin') || req.path.includes('/create-order')) {
+                        console.log('Using session settings:', req.effectiveSettings);
+                    }
+                    return next();
+                }
+            } catch (error) {
+                console.error('Error parsing session settings:', error);
+            }
+        }
+
+        // Fall back to global settings only if no session settings exist
+        req.effectiveSettings = {
+            IS_MOCK: process.env.IS_MOCK === 'true',
+            SKIP_PAYMENT: process.env.SKIP_PAYMENT === 'true',
+            DISABLE_FAUX_TIMERS: process.env.DISABLE_FAUX_TIMERS === 'true'
+        };
+        // Only log on actual setting changes or important endpoints
+        if (req.path.includes('/api/admin') || req.path.includes('/create-order')) {
+            console.log('Using global settings:', req.effectiveSettings);
+        }
+        next();
+    } catch (error) {
+        console.error('Error processing settings:', error);
+        next(error);
+    }
+});
+
+// Update the check-mock-mode endpoint to be more selective about logging
+app.get('/api/check-mock-mode', (req, res) => {
+    const settings = req.effectiveSettings;
+    // Only log when settings actually change
+    const settingsKey = JSON.stringify(settings);
+    if (req.app.locals.lastSettingsKey !== settingsKey) {
+        console.log('Settings changed to:', settings);
+        req.app.locals.lastSettingsKey = settingsKey;
+    }
+    
+    res.json({ 
+        isMock: settings.IS_MOCK,
+        skipPayment: settings.SKIP_PAYMENT,
+        disableFauxTimers: settings.DISABLE_FAUX_TIMERS,
+        source: req.headers['x-session-settings'] ? 'session' : 'global'
+    });
+});
+
+// Add these endpoints near other API routes
+app.get('/api/admin/settings', (req, res) => {
+    try {
+        const settings = {
+            IS_MOCK: process.env.IS_MOCK === 'true',
+            SKIP_PAYMENT: process.env.SKIP_PAYMENT === 'true',
+            DISABLE_FAUX_TIMERS: process.env.DISABLE_FAUX_TIMERS === 'true'
+        };
+        res.json(settings);
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+        res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+});
+
+app.post('/api/admin/settings', (req, res) => {
+    try {
+        const settings = req.body;
+        console.log('Updating settings:', settings); // Debug log
+
+        // Update environment variables
+        Object.entries(settings).forEach(([key, value]) => {
+            process.env[key] = value.toString();
+            console.log(`Updated ${key} to ${value}`); // Debug log
+        });
+
+        // Return updated settings
+        res.json({ 
+            success: true, 
+            settings: {
+                IS_MOCK: process.env.IS_MOCK === 'true',
+                SKIP_PAYMENT: process.env.SKIP_PAYMENT === 'true',
+                DISABLE_FAUX_TIMERS: process.env.DISABLE_FAUX_TIMERS === 'true'
+            }
+        });
+    } catch (error) {
+        console.error('Error updating settings:', error);
+        res.status(500).json({ error: 'Failed to update settings' });
+    }
+});
+
+// Add this endpoint to get user data
+app.get('/api/user', (req, res) => {
+    // Check for mock mode
+    if (req.effectiveSettings?.IS_MOCK) {
+        return res.json({
+            name: 'Test User',
+            email: 'test@example.com'
+        });
+    }
+
+    // If not in mock mode and no user, return default data
+    if (!req.user) {
+        return res.json({
+            name: 'Guest User',
+            email: 'guest@example.com'
+        });
+    }
+
+    // Return actual user data
+    res.json({
+        name: req.user.name,
+        email: req.user.email
+    });
+});
+

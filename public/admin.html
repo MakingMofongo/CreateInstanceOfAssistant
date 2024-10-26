@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOKO AI - Admin Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="admin-styles.css">
+    <!-- Add this in the head section -->
+    <link rel="stylesheet" href="session-indicator.css">
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <div class="logo">
+                <svg width="150" height="50" viewBox="0 0 150 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <text x="10" y="35" font-family="Poppins, sans-serif" font-size="32" font-weight="bold">
+                        <tspan fill="#FF3E3E">KOKO</tspan>
+                        <tspan fill="#FFFFFF">AI</tspan>
+                    </text>
+                </svg>
+            </div>
+            <h1>Admin Control Panel</h1>
+        </div>
+
+        <div class="admin-content">
+            <div class="settings-container">
+                <!-- Mode Selection -->
+                <div class="settings-mode-selector">
+                    <button class="mode-btn active" data-mode="global">
+                        <i class="fas fa-globe"></i>
+                        Global Settings
+                    </button>
+                    <button class="mode-btn" data-mode="session">
+                        <i class="fas fa-user"></i>
+                        Session Settings
+                    </button>
+                </div>
+
+                <!-- Add this right after the mode selection buttons -->
+                <button id="sessionEnableBtn" class="session-enable-btn" onclick="toggleSessionMode()" style="display: none;">
+                    Enable Session Mode
+                </button>
+
+                <!-- Core Settings -->
+                <div class="settings-section">
+                    <h2>Core Settings</h2>
+                    <div class="settings-grid">
+                        <div class="setting-card">
+                            <div class="setting-header">
+                                <i class="fas fa-vial"></i>
+                                <h3>Mock Mode</h3>
+                            </div>
+                            <p>Enable/disable mock mode for testing without real API calls</p>
+                            <div class="setting-control">
+                                <label class="switch">
+                                    <input type="checkbox" id="mockMode">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="setting-status" id="mockModeStatus">Disabled</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-card">
+                            <div class="setting-header">
+                                <i class="fas fa-credit-card"></i>
+                                <h3>Skip Payment</h3>
+                            </div>
+                            <p>Bypass payment processing for testing</p>
+                            <div class="setting-control">
+                                <label class="switch">
+                                    <input type="checkbox" id="skipPayment">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="setting-status" id="skipPaymentStatus">Disabled</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-card">
+                            <div class="setting-header">
+                                <i class="fas fa-clock"></i>
+                                <h3>Disable Faux Timers</h3>
+                            </div>
+                            <p>Use real progress instead of simulated timers</p>
+                            <div class="setting-control">
+                                <label class="switch">
+                                    <input type="checkbox" id="disableFauxTimers">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="setting-status" id="disableFauxTimersStatus">Disabled</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings -->
+                <div class="settings-section">
+                    <h2>Advanced Settings</h2>
+                    <div class="settings-grid">
+                        <div class="setting-card">
+                            <div class="setting-header">
+                                <i class="fas fa-phone"></i>
+                                <h3>Default Phone Number</h3>
+                            </div>
+                            <p>Set the default phone number for new deployments</p>
+                            <div class="setting-control">
+                                <input type="text" id="defaultPhone" value="+13394997114">
+                                <button class="save-btn" onclick="savePhoneNumber()">Save</button>
+                            </div>
+                        </div>
+
+                        <div class="setting-card">
+                            <div class="setting-header">
+                                <i class="fas fa-stopwatch"></i>
+                                <h3>Mock Timer Duration</h3>
+                            </div>
+                            <p>Set the duration for mock deployment steps (ms)</p>
+                            <div class="setting-control">
+                                <input type="number" id="mockTimerDuration" value="1000" min="100" step="100">
+                                <button class="save-btn" onclick="saveMockDuration()">Save</button>
+                            </div>
+                        </div>
+
+                        <div class="setting-card">
+                            <div class="setting-header">
+                                <i class="fas fa-database"></i>
+                                <h3>Clear Cache</h3>
+                            </div>
+                            <p>Clear all cached data and settings</p>
+                            <div class="setting-control">
+                                <button class="danger-btn" onclick="clearCache()">
+                                    <i class="fas fa-trash"></i> Clear Cache
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Status -->
+                <div class="settings-section">
+                    <h2>System Status</h2>
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <div class="status-header">
+                                <i class="fas fa-server"></i>
+                                <h3>API Status</h3>
+                            </div>
+                            <div class="status-indicator online">
+                                <span class="status-dot"></span>
+                                <span class="status-text">Online</span>
+                            </div>
+                        </div>
+
+                        <div class="status-card">
+                            <div class="status-header">
+                                <i class="fas fa-database"></i>
+                                <h3>Database</h3>
+                            </div>
+                            <div class="status-indicator online">
+                                <span class="status-dot"></span>
+                                <span class="status-text">Connected</span>
+                            </div>
+                        </div>
+
+                        <div class="status-card">
+                            <div class="status-header">
+                                <i class="fas fa-users"></i>
+                                <h3>Active Users</h3>
+                            </div>
+                            <div class="status-count">
+                                <span id="activeUsers">12</span>
+                                <small>users online</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="admin.js"></script>
+    <!-- Add this before the closing </body> tag in both index.html and admin.html -->
+    <script src="session-indicator.js"></script>
+</body>
+</html>

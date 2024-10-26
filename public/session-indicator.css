@@ -1,0 +1,88 @@
+.session-indicator {
+    position: fixed;
+    top: 60px; /* Adjust this to be closer to admin button */
+    right: 20px;
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #000;
+    border-radius: 8px;
+    z-index: 999; /* Ensure this is lower than admin button */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-20px);
+    min-width: 200px;
+}
+
+.session-indicator.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.session-main {
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.session-id {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.session-toggle {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+}
+
+.session-toggle.rotated {
+    transform: rotate(180deg);
+}
+
+.session-details {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: rgba(0, 0, 0, 0.05);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.session-indicator.expanded .session-details {
+    max-height: 200px;
+}
+
+.session-settings {
+    padding: 10px 15px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 0.9em;
+}
+
+.setting-label {
+    font-weight: 500;
+}
+
+.setting-value {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.setting-value.enabled {
+    background: rgba(0, 255, 0, 0.1);
+}
+
+.setting-value.disabled {
+    background: rgba(255, 0, 0, 0.1);
+}

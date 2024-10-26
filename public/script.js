@@ -11,6 +11,184 @@ let selectedAmount = 0;
 // Add this near the top of your script.js file
 let eventSource = null;
 
+// Add these variables at the top with other global variables
+let currentMode = 'global';
+let sessionId = null;
+
+// Add this function to handle admin settings
+function initializeAdminSettings() {
+    // Mode selection handling
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMode = btn.dataset.mode;
+            loadSettings(currentMode);
+        });
+    });
+
+    // Initialize switches
+    initializeSwitch('mockMode', 'IS_MOCK');
+    initializeSwitch('skipPayment', 'SKIP_PAYMENT');
+    initializeSwitch('disableFauxTimers', 'DISABLE_FAUX_TIMERS');
+
+    // Load initial settings
+    loadSettings('global');
+}
+
+function initializeSwitch(elementId, settingKey) {
+    const switchElement = document.getElementById(elementId);
+    const statusElement = document.getElementById(`${elementId}Status`);
+    
+    if (switchElement && statusElement) {
+        switchElement.addEventListener('change', async () => {
+            const isEnabled = switchElement.checked;
+            statusElement.textContent = isEnabled ? 'Enabled' : 'Disabled';
+            
+            try {
+                if (currentMode === 'session') {
+                    // Handle session-specific settings
+                    if (!sessionId) {
+                        sessionId = 'session_' + Math.random().toString(36).substring(7);
+                    }
+                    const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+                    sessionSettings[settingKey] = isEnabled;
+                    sessionSettings.isActive = true;
+                    sessionSettings.sessionId = sessionId;
+                    sessionStorage.setItem('sessionSettings', JSON.stringify(sessionSettings));
+                    
+                    // Show session indicator
+                    showSessionIndicator(sessionId);
+                } else {
+                    // Handle global settings
+                    await updateGlobalSetting(settingKey, isEnabled);
+                }
+                
+                // Notify other windows/tabs about the change
+                window.postMessage({
+                    type: 'settingsUpdated',
+                    mode: currentMode,
+                    settings: currentMode === 'session' ? 
+                        JSON.parse(sessionStorage.getItem('sessionSettings')) :
+                        { [settingKey]: isEnabled }
+                }, '*');
+                
+                showToast(`${settingKey} ${isEnabled ? 'enabled' : 'disabled'} (${currentMode} mode)`, 'success');
+            } catch (error) {
+                console.error('Error updating setting:', error);
+                showToast('Failed to update setting', 'error');
+                // Revert switch state
+                switchElement.checked = !isEnabled;
+                statusElement.textContent = !isEnabled ? 'Enabled' : 'Disabled';
+            }
+        });
+    }
+}
+
+async function loadSettings(mode) {
+    if (mode === 'session') {
+        const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+        updateSwitchesFromSettings(sessionSettings);
+        if (sessionSettings.isActive && sessionSettings.sessionId) {
+            showSessionIndicator(sessionSettings.sessionId);
+        }
+    } else {
+        try {
+            const response = await fetch('/api/admin/settings');
+            const settings = await response.json();
+            updateSwitchesFromSettings(settings);
+            hideSessionIndicator();
+        } catch (error) {
+            console.error('Error loading settings:', error);
+            showToast('Failed to load settings', 'error');
+        }
+    }
+}
+
+function updateSwitchesFromSettings(settings) {
+    Object.entries(settings).forEach(([key, value]) => {
+        const switchElement = document.getElementById(key.toLowerCase());
+        const statusElement = document.getElementById(`${key.toLowerCase()}Status`);
+        if (switchElement && statusElement) {
+            switchElement.checked = value;
+            statusElement.textContent = value ? 'Enabled' : 'Disabled';
+        }
+    });
+}
+
+function showSessionIndicator(sessionId) {
+    // Remove existing indicator if any
+    hideSessionIndicator();
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'session-indicator';
+    indicator.className = 'session-indicator';
+    indicator.innerHTML = `
+        <i class="fas fa-user-clock"></i>
+        <span>Session Mode Active</span>
+        <span id="mainSessionId">${sessionId.split('_').pop()}</span>
+    `;
+    document.body.appendChild(indicator);
+}
+
+function hideSessionIndicator() {
+    const indicator = document.getElementById('session-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    const container = document.getElementById('toast-container') || createToastContainer();
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+        if (container.children.length === 0) {
+            container.remove();
+        }
+    }, 3000);
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+    return container;
+}
+
+async function updateGlobalSetting(key, value) {
+    const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value })
+    });
+    
+    if (!response.ok) {
+        throw new Error('Failed to update setting');
+    }
+}
+
+// Add this at the start of your script
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('/api/check-mock-mode');
+        const { isMock } = await response.json();
+        if (isMock) {
+            document.getElementById('mock-mode-indicator').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking mock mode:', error);
+    }
+});
+
 document.getElementById('createBotForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -53,78 +231,85 @@ async function retrieveFinalData(requestId) {
 
 // Update Progress UI
 function updateProgressUI(data) {
+    console.log('Updating progress UI with data:', data);
+    
     const progressSteps = document.getElementById('progress-steps');
-    const steps = [
-        { title: 'Initializing', description: 'Setting up your AI receptionist', time: '~10 sec' },
-        { title: 'Creating Knowledge Base', description: 'Building hotel information database', time: '~20 sec' },
-        { title: 'Training AI', description: 'Teaching your AI about your hotel', time: '~30 sec' },
-        { title: 'Cloud Setup', description: 'Preparing cloud infrastructure', time: '~20 sec' },
-        { title: 'Deployment', description: 'Launching your AI receptionist', time: 'Variable' },
-        { title: 'Phone Configuration', description: 'Setting up your phone number', time: '~10 sec' }
-    ];
+    if (!progressSteps) {
+        console.error('Progress steps container not found');
+        return;
+    }
+
+    // Skip the initial connection message
+    if (data.status === 'Connected') {
+        return;
+    }
+
+    if (data.error) {
+        console.error('Received error:', data.error);
+        showErrorMessage(data.error);
+        return;
+    }
 
     if (data.status === 'completed') {
-        isDeploymentOngoing = false;
-        steps.forEach((step, index) => {
-            updateStepProgress(progressSteps.querySelector(`.progress-step:nth-child(${index + 1})`), 'completed', 100);
+        console.log('Received completion data:', data);
+        // Handle completion
+        const steps = progressSteps.querySelectorAll('.progress-step');
+        steps.forEach(step => {
+            step.classList.add('completed');
+            step.classList.remove('active');
+            step.querySelector('.progress-bar-fill').style.width = '100%';
+            step.querySelector('.progress-step-icon').textContent = '✓';
         });
+
+        // Show completion details
+        const completionDetails = document.getElementById('completion-details');
+        if (data.serviceUrl && data.phoneNumber && data.username && data.password) {
+            console.log('All required completion data present, showing success UI');
+            // ... (rest of the success UI code)
+        } else {
+            console.error('Missing completion data:', {
+                serviceUrl: !!data.serviceUrl,
+                phoneNumber: !!data.phoneNumber,
+                username: !!data.username,
+                password: !!data.password
+            });
+            completionDetails.innerHTML = `
+                <div class="error-section">
+                    <p>⚠️ Deployment completed but some information is missing.</p>
+                    <p>Missing data: ${Object.entries({
+                        'Service URL': !data.serviceUrl,
+                        'Phone Number': !data.phoneNumber,
+                        'Username': !data.username,
+                        'Password': !data.password
+                    }).filter(([_, missing]) => missing).map(([key]) => key).join(', ')}</p>
+                    <p>Please contact support if this persists.</p>
+                </div>`;
+        }
+    } else if (data.status) {
+        // Update current step
+        const steps = progressSteps.querySelectorAll('.progress-step');
+        const currentStepIndex = Array.from(steps).findIndex(step => 
+            step.querySelector('.progress-step-title').textContent.toLowerCase() === data.status.toLowerCase()
+        );
         
-        window.generatedPassword = data.password;
-        
-        document.getElementById('completion-details').innerHTML = `
-            <div class="credentials-section">
-                <div class="credentials-title">🎉 Your AI Receptionist is Ready! 🎉</div>
-                <div class="credential-item">
-                    <span class="credential-label"> Phone Number:</span>
-                    <span class="credential-value">${data.phoneNumber}</span>
-                </div>
-                <div class="credential-item">
-                    <span class="credential-label">🌐 Service URL:</span>
-                    <span class="credential-value clickable-url" onclick="window.open('${data.serviceUrl}/login', '_blank')">${data.serviceUrl}/login</span>
-                    <br><small>(Click to open the CONSOLE for this agent)</small>
-                </div>
-                <div class="credential-item">
-                    <span class="credential-label">👤 Username:</span>
-                    <span class="credential-value">${data.username}</span>
-                </div>
-                <div class="credential-item">
-                    <span class="credential-label">🔑 Password:</span>
-                    <span class="credential-value password-hidden" id="password-value">••••••••</span>
-                    <button class="password-toggle" onclick="togglePassword()">Show</button>
-                </div>
-                <p class="password-warning">🔒 Keep these credentials safe and secure!</p>
-            </div>`;
-        
-        showStep(3);
-        celebrate();
-        
-        document.getElementById('completion-details').innerHTML += `
-            <p>If you lose this information, you can retrieve it later using your request ID: ${currentRequestId}</p>`;
-    } else if (data.error) {
-        isDeploymentOngoing = false; // Stop the deployment process
-        progressSteps.innerHTML = ''; // Clear existing progress steps
-        const errorStep = document.createElement('div');
-        errorStep.className = 'progress-step error';
-        errorStep.innerHTML = `
-            <div class="progress-step-header">
-                <div class="progress-step-icon">❌</div>
-                <div class="progress-step-title">Error</div>
-            </div>
-            <div class="progress-step-description">${data.error}</div>
-        `;
-        progressSteps.appendChild(errorStep);
-        showErrorMessage(data.error);
-    } else if (data.status !== 'end' && data.status !== 'Connected') {
-        const currentStep = steps.findIndex(step => step.title.toLowerCase() === data.status.toLowerCase());
-        if (currentStep !== -1) {
+        if (currentStepIndex !== -1) {
             steps.forEach((step, index) => {
-                const stepElement = progressSteps.querySelector(`.progress-step:nth-child(${index + 1})`);
-                const stepStatus = index < currentStep ? 'completed' : index === currentStep ? 'active' : '';
-                const stepProgress = index < currentStep ? 100 : (index === currentStep ? data.progress : 0);
-                if (stepElement) {
-                    updateStepProgress(stepElement, stepStatus, stepProgress, data.substep);
+                if (index < currentStepIndex) {
+                    // Completed steps
+                    step.classList.add('completed');
+                    step.classList.remove('active');
+                    step.querySelector('.progress-bar-fill').style.width = '100%';
+                    step.querySelector('.progress-step-icon').textContent = '✓';
+                } else if (index === currentStepIndex) {
+                    // Current step
+                    step.classList.add('active');
+                    step.classList.remove('completed');
+                    step.querySelector('.progress-bar-fill').style.width = `${data.progress || 0}%`;
                 } else {
-                    progressSteps.innerHTML += createStepHTML(step, stepStatus, stepProgress, data.substep);
+                    // Future steps
+                    step.classList.remove('active', 'completed');
+                    step.querySelector('.progress-bar-fill').style.width = '0%';
+                    step.querySelector('.progress-step-icon').textContent = index + 1;
                 }
             });
         }
@@ -513,76 +698,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('changeHiltonUrl').addEventListener('click', changeHiltonUrl);
 });
 
-// Add this new function to handle errors
-function showErrorMessage(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.innerHTML = `
-        <p>${message}</p>
-        <p>An error occurred during the bot creation process. Please check the server logs for more details.</p>
-        <button onclick="retryCreation()">Try Again</button>
-    `;
-    document.getElementById('step2-content').appendChild(errorDiv);
-}
-
-// Add this new function to retry the creation process
-function retryCreation() {
-    document.querySelector('.error-message')?.remove();
-    document.getElementById('progress-steps').innerHTML = '';
-    showStep(1);
-}
-
-// Add this function to the script.js file
-function retrieveBotData(requestId) {
-  fetch(`/retrieve-bot-data?requestId=${requestId}`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to retrieve bot data');
-      }
-      return response.json();
-    })
-    .then(data => {
-      // Display the retrieved data
-      document.getElementById('completion-details').innerHTML = `
-        <div class="credentials-section">
-          <div class="credentials-title">🎉 Your AI Receptionist Information 🎉</div>
-          <div class="credential-item">
-            <span class="credential-label">📞 Phone Number:</span>
-            <span class="credential-value">${data.phoneNumber}</span>
-          </div>
-          <div class="credential-item">
-            <span class="credential-label">🌐 Service URL:</span>
-            <span class="credential-value clickable-url" onclick="window.open('${data.serviceUrl}/login', '_blank')">${data.serviceUrl}/login</span>
-            <br><small>(Click to open the CONSOLE for this agent)</small>
-          </div>
-          <div class="credential-item">
-            <span class="credential-label">👤 Username:</span>
-            <span class="credential-value">${data.username}</span>
-          </div>
-          <div class="credential-item">
-            <span class="credential-label">🔑 Password:</span>
-            <span class="credential-value password-hidden" id="password-value">••••••••</span>
-            <button class="password-toggle" onclick="togglePassword()">Show</button>
-          </div>
-          <p class="password-warning">🔒 Keep these credentials safe and secure!</p>
-        </div>`;
-      
-      window.generatedPassword = data.password;
-      showStep(3);
-    })
-    .catch(error => {
-      console.error('Error retrieving bot data:', error);
-      alert('Failed to retrieve bot data. Please try again or contact support.');
-    });
-}
-
-// Add this to allow users to input their request ID and retrieve data
-document.getElementById('retrieveDataForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const requestId = document.getElementById('requestIdInput').value;
-  retrieveBotData(requestId);
-});
-
 // Add this new function to handle the persistent prompt toggle
 function togglePersistentPrompt() {
     const persistentPrompt = document.getElementById('persistentPrompt');
@@ -675,12 +790,23 @@ document.querySelector('.continue-payment').addEventListener('click', function()
 // Function to create a Razorpay order
 async function createRazorpayOrder(amount) {
     try {
+        // Get headers with session settings
+        const headers = {
+            'Content-Type': 'application/json',
+            ...getRequestHeaders()
+        };
+
+        console.log('Creating order with headers:', headers);
+
         const response = await fetch('/create-order', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ amount, currency: 'EUR', receipt: `receipt_${Date.now()}`, notes: {} })
+            headers: headers,
+            body: JSON.stringify({ 
+                amount, 
+                currency: 'EUR', 
+                receipt: `receipt_${Date.now()}`, 
+                notes: {} 
+            })
         });
 
         if (!response.ok) {
@@ -688,7 +814,14 @@ async function createRazorpayOrder(amount) {
         }
 
         const order = await response.json();
-        openRazorpayCheckout(order);
+        console.log('Order created:', order);
+        
+        // Check if it's a mock order
+        if (order.mock) {
+            openMockPayment(order);
+        } else {
+            openRazorpayCheckout(order);
+        }
     } catch (error) {
         console.error('Error creating order:', error);
         alert(`Failed to create order. Error: ${error.message}`);
@@ -721,13 +854,15 @@ function openRazorpayCheckout(order) {
     rzp.open();
 }
 
-// Function to verify payment
+// Update the verifyPayment function to properly trigger bot creation
 async function verifyPayment(response) {
+    console.log('Starting payment verification with response:', response);
     try {
         const verificationResponse = await fetch('/verify-payment', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getRequestHeaders()
             },
             body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
@@ -737,42 +872,142 @@ async function verifyPayment(response) {
         });
 
         const data = await verificationResponse.json();
+        console.log('Payment verification response:', data);
+        
         if (data.status === 'ok') {
-            alert('Payment successful!');
-            createBot(); // Call createBot function after successful payment
+            console.log('Payment verification successful, starting bot creation...');
+            // Move to step 3 immediately
+            showStep(3);
+            
+            // Initialize progress steps
+            initializeProgressSteps();
+            
+            // Start the actual bot creation
+            await startBotCreation();
         } else {
+            console.error('Payment verification failed:', data);
             alert('Payment verification failed. Please contact support.');
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error during payment verification:', error);
         alert('Error verifying payment. Please contact support.');
     }
 }
 
-// Function to create bot after successful payment
-async function createBot() {
+// Add new function to initialize progress steps
+function initializeProgressSteps() {
+    console.log('Initializing progress steps...');
+    const progressSteps = document.getElementById('progress-steps');
+    progressSteps.innerHTML = ''; // Clear existing steps
+    
+    const steps = [
+        { title: 'Initializing', description: 'Setting up your AI receptionist' },
+        { title: 'Creating Knowledge Base', description: 'Building information database' },
+        { title: 'Training AI', description: 'Teaching your AI assistant' },
+        { title: 'Cloud Setup', description: 'Preparing cloud infrastructure' },
+        { title: 'Deployment', description: 'Launching your AI receptionist' },
+        { title: 'Phone Configuration', description: 'Setting up your phone number' }
+    ];
+
+    steps.forEach((step, index) => {
+        progressSteps.innerHTML += `
+            <div class="progress-step ${index === 0 ? 'active' : ''}">
+                <div class="progress-step-header">
+                    <div class="progress-step-icon">${index + 1}</div>
+                    <div class="progress-step-title">${step.title}</div>
+                </div>
+                <div class="progress-step-description">${step.description}</div>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" style="width: ${index === 0 ? '0%' : '0%'}"></div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// Add new function to handle the actual bot creation
+async function startBotCreation() {
     try {
+        console.log('Starting bot creation process...');
         const formData = new FormData(document.getElementById('createBotForm'));
+        
+        // Get session settings and auth token
+        const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+        const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+        const token = localStorage.getItem('token');
+        
+        // Prepare headers
+        const headers = {
+            'Authorization': `Bearer ${token}` // Add authorization header
+        };
+
+        if (isSessionEnabled && sessionSettings.isActive) {
+            headers['X-Session-Settings'] = JSON.stringify(sessionSettings);
+            console.log('Including session settings in request:', sessionSettings);
+        }
+
+        console.log('Making create-bot POST request with headers:', headers);
         const response = await fetch('/create-bot', {
             method: 'POST',
-            body: formData,
-            // Remove the Authorization header
-            // headers: {
-            //     'Authorization': `Bearer ${localStorage.getItem('token')}`
-            // }
+            headers: headers,
+            body: formData
         });
 
         if (!response.ok) {
-            throw new Error('Failed to create bot');
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to create bot');
         }
 
-        const data = await response.json();
-        console.log('Bot creation initiated:', data);
-        showStep(3); // Move to the next step after initiating bot creation
+        const { requestId } = await response.json();
+        console.log('Received requestId:', requestId);
+        
+        // Connect to SSE endpoint
+        await connectToEventSource(requestId, sessionSettings);
+        
     } catch (error) {
-        console.error('Error creating bot:', error);
-        alert('Failed to create bot. Please try again.');
+        console.error('Error in startBotCreation:', error);
+        showErrorMessage('Failed to create bot: ' + error.message);
     }
+}
+
+// Update the connectToEventSource function to include auth token
+async function connectToEventSource(requestId, sessionSettings) {
+    console.log('Connecting to EventSource with requestId:', requestId);
+    
+    if (window.eventSource) {
+        console.log('Closing existing EventSource');
+        window.eventSource.close();
+    }
+
+    const token = localStorage.getItem('token');
+    let url = `/create-bot?requestId=${requestId}&token=${token}`; // Add token to URL
+
+    if (sessionSettings?.isActive) {
+        url += `&sessionSettings=${encodeURIComponent(JSON.stringify(sessionSettings))}`;
+    }
+    console.log('SSE URL:', url);
+
+    window.eventSource = new EventSource(url);
+    
+    window.eventSource.onopen = () => {
+        console.log('SSE connection opened');
+    };
+    
+    window.eventSource.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('Received SSE update:', data);
+            updateProgressUI(data);
+        } catch (error) {
+            console.error('Error parsing SSE data:', error);
+        }
+    };
+    
+    window.eventSource.onerror = (error) => {
+        console.error('EventSource failed:', error);
+        window.eventSource.close();
+        showErrorMessage('Lost connection to server. Please try again.');
+    };
 }
 
 // Make sure to call initializePricingToggle when the page loads
@@ -813,16 +1048,25 @@ document.getElementById('createBotForm').addEventListener('submit', async (e) =>
     }
 });
 
-function connectToEventSource(requestId) {
+function connectToEventSource(requestId, sessionSettings) {
     if (eventSource) {
         eventSource.close();
     }
 
-    eventSource = new EventSource(`/create-bot?requestId=${requestId}`);
+    let url = `/create-bot?requestId=${requestId}`;
+    if (sessionSettings) {
+        url += `&sessionSettings=${encodeURIComponent(JSON.stringify(sessionSettings))}`;
+    }
+
+    eventSource = new EventSource(url);
     
     eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        updateProgress(data);
+        try {
+            const data = JSON.parse(event.data);
+            updateProgressUI(data);
+        } catch (error) {
+            console.error('Error parsing SSE data:', error);
+        }
     };
     
     eventSource.onerror = (error) => {
@@ -879,4 +1123,405 @@ function updateProgress(data) {
         }
         progressStep.textContent = statusText;
     }
+}
+
+// Update the mock payment functions
+function openMockPayment(order) {
+    console.log('Opening mock payment modal for order:', order);
+    // Create and show the mock payment modal
+    const mockPaymentModal = document.createElement('div');
+    mockPaymentModal.className = 'modal';
+    mockPaymentModal.style.display = 'block';
+    
+    mockPaymentModal.innerHTML = `
+        <div class="modal-content" style="text-align: center; padding: 2rem;">
+            <h2>Mock Payment</h2>
+            <p>Amount: €${(order.amount / 100).toFixed(2)}</p>
+            <p>Plan: ${selectedPlan}</p>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 2rem;">
+                <button onclick="handleMockPayment('success', '${order.id}')" 
+                    style="background: var(--success-color); padding: 1rem 2rem;">
+                    Success
+                </button>
+                <button onclick="handleMockPayment('failure', '${order.id}')" 
+                    style="background: var(--error-color); padding: 1rem 2rem;">
+                    Failure
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(mockPaymentModal);
+}
+
+// Update handleMockPayment function
+async function handleMockPayment(result, orderId) {
+    console.log('Handling mock payment:', { result, orderId });
+    try {
+        // Remove the mock payment modal
+        document.querySelector('.modal').remove();
+        
+        if (result === 'success') {
+            const mockResponse = {
+                razorpay_order_id: orderId,
+                razorpay_payment_id: 'mock_pay_' + Math.random().toString(36).substr(2, 9),
+                razorpay_signature: 'mock_sig_' + Math.random().toString(36).substr(2, 9)
+            };
+            
+            console.log('Mock payment successful, verifying...');
+            const verificationResponse = await fetch('/verify-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getRequestHeaders()
+                },
+                body: JSON.stringify(mockResponse)
+            });
+
+            if (!verificationResponse.ok) {
+                throw new Error('Failed to verify mock payment');
+            }
+
+            const data = await verificationResponse.json();
+            console.log('Mock payment verification response:', data);
+            
+            if (data.status === 'ok') {
+                console.log('Mock payment verified successfully, starting bot creation...');
+                // Move to step 3 immediately
+                showStep(3);
+                
+                // Initialize progress steps
+                initializeProgressSteps();
+                
+                // Start the actual bot creation
+                await startBotCreation();
+            } else {
+                throw new Error('Mock payment verification failed');
+            }
+        } else {
+            throw new Error('Mock payment cancelled');
+        }
+    } catch (error) {
+        console.error('Error processing mock payment:', error);
+        alert(error.message);
+    }
+}
+
+// Add these event listeners to the existing DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if session mode is active
+    const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+    if (sessionSettings.isActive && sessionSettings.sessionId) {
+        showSessionIndicator(sessionSettings.sessionId);
+    }
+
+    // Initialize admin settings if we're on the admin page
+    if (document.querySelector('.admin-container')) {
+        initializeAdminSettings();
+    }
+});
+
+// Add this at the start of your script
+document.addEventListener('DOMContentLoaded', () => {
+    // Check for session mode
+    const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+    
+    if (isSessionEnabled && sessionSettings.isActive && sessionSettings.sessionId) {
+        showSessionIndicator(sessionSettings.sessionId);
+    }
+
+    // Check for mock mode only if not in session mode
+    if (!isSessionEnabled) {
+        checkMockMode();
+    }
+});
+
+// Separate the mock mode check
+async function checkMockMode() {
+    try {
+        const response = await fetch('/api/check-mock-mode');
+        const { isMock } = await response.json();
+        if (isMock) {
+            document.getElementById('mock-mode-indicator').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking mock mode:', error);
+    }
+}
+
+// Add session cleanup on window unload
+window.addEventListener('unload', () => {
+    // Only clean up if it's a full browser close, not navigation
+    if (performance.navigation.type === 2) {
+        sessionStorage.removeItem('sessionEnabled');
+        sessionStorage.removeItem('sessionSettings');
+    }
+});
+
+// Add these utility functions to script.js so they're available everywhere
+function showSessionIndicator(sessionId) {
+    hideSessionIndicator(); // Remove any existing indicator
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'session-indicator';
+    indicator.className = 'session-indicator';
+    indicator.innerHTML = `
+        <i class="fas fa-user-clock"></i>
+        <span>Session Mode Active</span>
+        <span id="mainSessionId">${sessionId.split('_').pop()}</span>
+    `;
+    document.body.appendChild(indicator);
+}
+
+function hideSessionIndicator() {
+    const indicator = document.getElementById('session-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+// Add this function to check session settings before making API calls
+function getEffectiveSettings() {
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+    if (isSessionEnabled) {
+        const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+        return {
+            IS_MOCK: sessionSettings.IS_MOCK || false,
+            SKIP_PAYMENT: sessionSettings.SKIP_PAYMENT || false,
+            DISABLE_FAUX_TIMERS: sessionSettings.DISABLE_FAUX_TIMERS || false
+        };
+    }
+    return null; // Let the server use global settings
+}
+
+// Add this function to handle admin panel navigation
+function navigateToAdmin(e) {
+    e.preventDefault(); // Prevent default navigation
+    
+    // Store current page URL to return to it later
+    sessionStorage.setItem('previousPage', window.location.href);
+    
+    // Navigate to admin panel without reloading
+    window.location.replace('admin.html');
+}
+
+// Update the admin button in the HTML to use onclick instead of direct navigation
+document.querySelector('.admin-button').onclick = navigateToAdmin;
+
+// Add this to the DOMContentLoaded event listener
+document.addEventListener('DOMContentLoaded', () => {
+    // Check for session mode
+    const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+    
+    if (isSessionEnabled && sessionSettings.isActive && sessionSettings.sessionId) {
+        showSessionIndicator(sessionSettings.sessionId);
+    }
+
+    // Check for mock mode only if not in session mode
+    if (!isSessionEnabled) {
+        checkMockMode();
+    }
+
+    // Add click handler for admin button if it exists
+    const adminButton = document.querySelector('.admin-button');
+    if (adminButton) {
+        adminButton.onclick = navigateToAdmin;
+    }
+});
+
+// Update the window unload event to only clean up on browser close, not navigation
+window.addEventListener('beforeunload', (e) => {
+    // Check if this is a page navigation or browser close
+    if (e.clientY < 0) { // Browser close
+        sessionStorage.removeItem('sessionEnabled');
+        sessionStorage.removeItem('sessionSettings');
+    }
+});
+
+// Add this function to check settings with proper priority
+async function getEffectiveSettings() {
+    // First check if session mode is enabled and has settings
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+    if (isSessionEnabled) {
+        const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+        if (sessionSettings.isActive) {
+            return {
+                isMock: sessionSettings.IS_MOCK ?? false,
+                skipPayment: sessionSettings.SKIP_PAYMENT ?? false,
+                disableFauxTimers: sessionSettings.DISABLE_FAUX_TIMERS ?? false
+            };
+        }
+    }
+
+    // If no session settings, fall back to global settings
+    try {
+        const response = await fetch('/api/admin/settings');
+        const settings = await response.json();
+        return {
+            isMock: settings.IS_MOCK,
+            skipPayment: settings.SKIP_PAYMENT,
+            disableFauxTimers: settings.DISABLE_FAUX_TIMERS
+        };
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+        return null;
+    }
+}
+
+// Update the DOMContentLoaded event listener
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check for session mode first
+    const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+    
+    if (isSessionEnabled && sessionSettings.isActive) {
+        // Show session indicator
+        if (sessionSettings.sessionId) {
+            showSessionIndicator(sessionSettings.sessionId);
+        }
+        
+        // Show mock mode indicator if enabled in session
+        if (sessionSettings.IS_MOCK) {
+            document.getElementById('mock-mode-indicator').style.display = 'block';
+        }
+    } else {
+        // Fall back to checking global settings
+        try {
+            const response = await fetch('/api/check-mock-mode');
+            const { isMock } = await response.json();
+            if (isMock) {
+                document.getElementById('mock-mode-indicator').style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error checking mock mode:', error);
+        }
+    }
+});
+
+// Add this function to include session settings in fetch calls
+function getFetchOptions() {
+    const options = {
+        headers: {}
+    };
+
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+    if (isSessionEnabled) {
+        const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+        if (sessionSettings.isActive) {
+            options.headers['X-Session-Settings'] = JSON.stringify({
+                IS_MOCK: sessionSettings.IS_MOCK,
+                SKIP_PAYMENT: sessionSettings.SKIP_PAYMENT,
+                DISABLE_FAUX_TIMERS: sessionSettings.DISABLE_FAUX_TIMERS
+            });
+        }
+    }
+
+    return options;
+}
+
+// Update all fetch calls to use these options
+async function checkMockMode() {
+    try {
+        const response = await fetch('/api/check-mock-mode', getFetchOptions());
+        const { isMock } = await response.json();
+        if (isMock) {
+            document.getElementById('mock-mode-indicator').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking mock mode:', error);
+    }
+}
+
+// Add this function to get headers with session settings
+function getRequestHeaders() {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+
+    const sessionSettings = JSON.parse(sessionStorage.getItem('sessionSettings') || '{}');
+    const isSessionEnabled = sessionStorage.getItem('sessionEnabled') === 'true';
+
+    if (isSessionEnabled && sessionSettings.isActive) {
+        headers['X-Session-Settings'] = JSON.stringify(sessionSettings);
+    }
+
+    return headers;
+}
+
+// Update all fetch calls to use these headers
+async function checkMockMode() {
+    try {
+        const response = await fetch('/api/check-mock-mode', {
+            headers: getRequestHeaders()
+        });
+        const { isMock } = await response.json();
+        if (isMock) {
+            document.getElementById('mock-mode-indicator').style.display = 'block';
+        } else {
+            document.getElementById('mock-mode-indicator').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking mock mode:', error);
+    }
+}
+
+// Add this function to periodically check settings
+function startSettingsCheck() {
+    setInterval(checkMockMode, 1000); // Check every second
+}
+
+// Call this on page load
+document.addEventListener('DOMContentLoaded', () => {
+    checkMockMode();
+    startSettingsCheck();
+});
+
+// Add this function to handle error messages
+function showErrorMessage(message) {
+    // Remove any existing error message
+    const existingError = document.querySelector('.error-message');
+    if (existingError) {
+        existingError.remove();
+    }
+
+    // Create new error message element
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <p>${message}</p>
+        <p>An error occurred during the bot creation process. Please check the console for more details.</p>
+        <button onclick="retryCreation()">Try Again</button>
+    `;
+
+    // Find the appropriate container to show the error
+    const container = document.getElementById('progress-steps') || 
+                     document.getElementById('step3-content') ||
+                     document.querySelector('.deployment-container');
+    
+    if (container) {
+        container.appendChild(errorDiv);
+    } else {
+        // Fallback to appending to body if no container found
+        document.body.appendChild(errorDiv);
+    }
+
+    // Log error to console
+    console.error('Bot creation error:', message);
+}
+
+// Add the retry function
+function retryCreation() {
+    // Remove error message
+    document.querySelector('.error-message')?.remove();
+    
+    // Clear progress steps
+    const progressSteps = document.getElementById('progress-steps');
+    if (progressSteps) {
+        progressSteps.innerHTML = '';
+    }
+    
+    // Go back to step 1
+    showStep(1);
 }

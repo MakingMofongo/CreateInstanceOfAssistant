@@ -799,8 +799,32 @@ footer {
     transform: translateY(0);
 }
 
-#persistentPrompt.closed {
-    transform: translateY(calc(100% - 40px));
+.mock-mode-indicator {
+    display: none; /* Hidden by default */
+    background: linear-gradient(90deg, #FFD700, #FFA500);
+    color: #000;
+    text-align: center;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    animation: pulse 2s infinite;
+}
+
+.mock-badge {
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+}
+
+.mock-description {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
 }
 
 .hilton-button {
@@ -1497,4 +1521,275 @@ input:checked + .slider:before {
     text-align: center;
     font-size: 14px;
     color: #666;
+}
+
+.deployment-container {
+    background-color: var(--surface-color);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: 0 8px 32px rgba(255, 62, 62, 0.1);
+}
+
+.progress-container {
+    margin-top: 2rem;
+}
+
+.progress-step {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.progress-step.active {
+    background-color: rgba(255, 62, 62, 0.1);
+    border-left: 4px solid var(--primary-color);
+}
+
+.progress-step.completed {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-left: 4px solid var(--success-color);
+}
+
+.progress-step-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.progress-step-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 1rem;
+    font-size: 0.8rem;
+    color: var(--on-surface-color);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.progress-step.completed .progress-step-icon {
+    background-color: var(--success-color);
+}
+
+.progress-step.active .progress-step-icon {
+    background-color: var(--primary-color);
+}
+
+.progress-step-title {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
+.progress-step-description {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.5rem;
+    padding-left: 2.5rem;
+}
+
+.progress-bar {
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    transition: width 0.3s ease;
+}
+
+.progress-substep {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.5rem;
+    padding-left: 2.5rem;
+}
+
+.completion-details {
+    margin-top: 2rem;
+    padding: 2rem;
+    background: linear-gradient(145deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05));
+    border-radius: 8px;
+    border: 1px solid var(--success-color);
+}
+
+.credentials-section {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-radius: 8px;
+    padding: 2rem;
+    margin-top: 2rem;
+}
+
+.credentials-title {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--success-color);
+}
+
+.credential-item {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.credential-label {
+    font-weight: bold;
+    margin-right: 1rem;
+    color: var(--text-color);
+}
+
+.credential-value {
+    font-family: 'Courier New', monospace;
+    color: var(--text-color);
+}
+
+.password-toggle {
+    background: var(--primary-color);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    margin-left: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+.password-toggle:hover {
+    background-color: var(--secondary-color);
+}
+
+.error-message {
+    background-color: rgba(255, 82, 82, 0.1);
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.error-message button {
+    background-color: var(--error-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    cursor: pointer;
+}
+
+.error-message button:hover {
+    background-color: #ff3333;
+}
+
+/* Update the admin-access styles */
+.admin-access {
+    position: fixed;
+    top: 10px; /* Keep this at 10px */
+    right: 20px;
+    z-index: 1100;
+}
+
+.admin-button {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 15px rgba(255, 62, 62, 0.2);
+    white-space: nowrap;
+    position: relative;
+}
+
+.admin-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 62, 62, 0.3);
+}
+
+.admin-button i {
+    font-size: 1.2rem;
+}
+
+/* Remove any duplicate session indicator styles from styles.css since they're now in session-indicator.css */
+
+/* Add or update these styles */
+.session-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--primary-color);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+.session-indicator.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.session-indicator .session-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.session-indicator .session-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    display: none;
+}
+
+.session-indicator.expanded .session-details {
+    display: block;
+}
+
+.session-indicator .session-toggle {
+    transition: transform 0.3s ease;
+}
+
+.session-indicator .session-toggle.rotated {
+    transform: rotate(180deg);
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 5px 0;
+}
+
+.setting-value {
+    font-weight: bold;
+}
+
+.setting-value.enabled {
+    color: #4CAF50;
+}
+
+.setting-value.disabled {
+    color: #FF3E3E;
 }

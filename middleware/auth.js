@@ -2,9 +2,23 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 exports.protect = async (req, res, next) => {
-  // Check if we're in mock mode
-  if (process.env.IS_MOCK === 'true') {
-    // Set a mock user for testing
+  // Check session settings first
+  const sessionSettings = req.headers['x-session-settings'];
+  let isMockMode = process.env.IS_MOCK === 'true';
+
+  if (sessionSettings) {
+    try {
+      const settings = JSON.parse(sessionSettings);
+      if (settings.isActive) {
+        isMockMode = settings.IS_MOCK;
+      }
+    } catch (error) {
+      console.error('Error parsing session settings:', error);
+    }
+  }
+
+  // If in mock mode, set mock user and continue
+  if (isMockMode) {
     req.user = {
       _id: 'test_user_id',
       email: 'test@gmail.com',
@@ -13,6 +27,7 @@ exports.protect = async (req, res, next) => {
     return next();
   }
 
+  // Regular auth check
   let token;
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
