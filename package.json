@@ -17,12 +17,15 @@
   },
   "homepage": "",
   "dependencies": {
-    "@google-cloud/run": "^1.4.0",
+    "@google-cloud/monitoring": "^4.0.0",
+    "@google-cloud/run": "^1.0.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
+    "body-parser": "^1.19.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
+    "googleapis": "^129.0.0",
     "httpdispatcher": ">=2.1.2",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.10.0",
@@ -30,10 +33,9 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
     "openai": "^4.55.7",
-    "sinon": "^19.0.2",
-    "twilio": "^5.3.4",
     "razorpay": "^2.8.6",
-    "body-parser": "^1.19.0"
+    "sinon": "^19.0.2",
+    "twilio": "^5.3.4"
   },
   "engines": {
     "node": ">=18.0.0"

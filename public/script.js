@@ -15,6 +15,34 @@ let eventSource = null;
 let currentMode = 'global';
 let sessionId = null;
 
+// Add these variables at the top of your script
+let lastScrollTop = 0;
+let isBarVisible = true;
+const SCROLL_THRESHOLD = 50; // Amount of pixels to scroll before hiding/showing
+let scrollTimeout;
+
+// Add this function to handle the top bar visibility
+function handleTopBarVisibility() {
+    const topBar = document.querySelector('.top-bar');
+    const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+
+    // Don't do anything for small scroll amounts
+    if (Math.abs(lastScrollTop - currentScroll) <= SCROLL_THRESHOLD) return;
+
+    // Scrolling down and bar is visible
+    if (currentScroll > lastScrollTop && isBarVisible) {
+        topBar.style.transform = 'translateY(-100%)';
+        isBarVisible = false;
+    }
+    // Scrolling up and bar is hidden
+    else if (currentScroll < lastScrollTop && !isBarVisible) {
+        topBar.style.transform = 'translateY(0)';
+        isBarVisible = true;
+    }
+
+    lastScrollTop = currentScroll;
+}
+
 // Add this function to handle admin settings
 function initializeAdminSettings() {
     // Mode selection handling
@@ -251,7 +279,6 @@ function updateProgressUI(data) {
     }
 
     if (data.status === 'completed') {
-        console.log('Received completion data:', data);
         // Handle completion
         const steps = progressSteps.querySelectorAll('.progress-step');
         steps.forEach(step => {
@@ -262,29 +289,38 @@ function updateProgressUI(data) {
         });
 
         // Show completion details
-        const completionDetails = document.getElementById('completion-details');
-        if (data.serviceUrl && data.phoneNumber && data.username && data.password) {
-            console.log('All required completion data present, showing success UI');
-            // ... (rest of the success UI code)
-        } else {
-            console.error('Missing completion data:', {
-                serviceUrl: !!data.serviceUrl,
-                phoneNumber: !!data.phoneNumber,
-                username: !!data.username,
-                password: !!data.password
-            });
-            completionDetails.innerHTML = `
-                <div class="error-section">
-                    <p>⚠️ Deployment completed but some information is missing.</p>
-                    <p>Missing data: ${Object.entries({
-                        'Service URL': !data.serviceUrl,
-                        'Phone Number': !data.phoneNumber,
-                        'Username': !data.username,
-                        'Password': !data.password
-                    }).filter(([_, missing]) => missing).map(([key]) => key).join(', ')}</p>
-                    <p>Please contact support if this persists.</p>
+        if (data.serviceUrl && data.phoneNumber) {
+            // Store the password globally for the toggle function
+            window.generatedPassword = data.password;
+            
+            document.getElementById('completion-details').innerHTML = `
+                <div class="credentials-section">
+                    <div class="credentials-title">🎉 Your AI Receptionist is Ready! 🎉</div>
+                    <div class="credential-item">
+                        <span class="credential-label">📞 Phone Number:</span>
+                        <span class="credential-value">${data.phoneNumber}</span>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">🌐 Service URL:</span>
+                        <span class="credential-value clickable-url" onclick="window.open('${data.serviceUrl}/login', '_blank')">${data.serviceUrl}/login</span>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">👤 Username:</span>
+                        <span class="credential-value">${data.username}</span>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">🔑 Password:</span>
+                        <span class="credential-value" id="password-value-completion">••••••••</span>
+                        <button class="password-toggle" onclick="togglePassword('completion')">Show</button>
+                    </div>
+                    <p class="password-warning">🔒 Keep these credentials safe and secure!</p>
                 </div>`;
         }
+        
+        celebrate();
+        
+        // Refresh the deployed bots section
+        refreshDeployedBots();
     } else if (data.status) {
         // Update current step
         const steps = progressSteps.querySelectorAll('.progress-step');
@@ -305,6 +341,17 @@ function updateProgressUI(data) {
                     step.classList.add('active');
                     step.classList.remove('completed');
                     step.querySelector('.progress-bar-fill').style.width = `${data.progress || 0}%`;
+                    
+                    // Handle substep if present
+                    if (data.substep) {
+                        let substepElement = step.querySelector('.progress-substep');
+                        if (!substepElement) {
+                            substepElement = document.createElement('div');
+                            substepElement.className = 'progress-substep';
+                            step.appendChild(substepElement);
+                        }
+                        substepElement.textContent = data.substep;
+                    }
                 } else {
                     // Future steps
                     step.classList.remove('active', 'completed');
@@ -347,22 +394,6 @@ function updateStepProgress(stepElement, status, progress, substep) {
             stepElement.appendChild(substepElement);
         }
         substepElement.textContent = substep;
-    }
-}
-
-// Toggle Password Visibility
-function togglePassword() {
-    const passwordElement = document.getElementById('password-value');
-    const toggleButton = document.querySelector('.password-toggle');
-    
-    if (passwordElement.classList.contains('password-hidden')) {
-        passwordElement.textContent = window.generatedPassword;
-        passwordElement.classList.remove('password-hidden');
-        toggleButton.textContent = 'Hide';
-    } else {
-        passwordElement.textContent = '••••••••';
-        passwordElement.classList.add('password-hidden');
-        toggleButton.textContent = 'Show';
     }
 }
 
@@ -1158,8 +1189,6 @@ function openMockPayment(order) {
 async function handleMockPayment(result, orderId) {
     console.log('Handling mock payment:', { result, orderId });
     try {
-        // Remove the mock payment modal
-        document.querySelector('.modal').remove();
         
         if (result === 'success') {
             const mockResponse = {
@@ -1177,16 +1206,21 @@ async function handleMockPayment(result, orderId) {
                 },
                 body: JSON.stringify(mockResponse)
             });
-
+            
             if (!verificationResponse.ok) {
                 throw new Error('Failed to verify mock payment');
             }
-
+            
             const data = await verificationResponse.json();
             console.log('Mock payment verification response:', data);
             
             if (data.status === 'ok') {
+                // Remove the mock payment modal
+                document.querySelector('.modal').remove();
+                document.querySelector('.modal').remove();
+
                 console.log('Mock payment verified successfully, starting bot creation...');
+                
                 // Move to step 3 immediately
                 showStep(3);
                 
@@ -1525,3 +1559,95 @@ function retryCreation() {
     // Go back to step 1
     showStep(1);
 }
+
+// Add this function near the other bot-related functions in script.js
+
+function refreshDeployedBots() {
+    // Check if we're on the page with the bot list
+    const botListElement = document.getElementById('bot-list');
+    if (botListElement) {
+        // If the fetchDeployedBots function exists (from deployed-bots.js), call it
+        if (typeof fetchDeployedBots === 'function') {
+            fetchDeployedBots();
+        } else {
+            console.warn('fetchDeployedBots function not found. Make sure deployed-bots.js is loaded.');
+        }
+    } else {
+        console.log('Bot list not found on this page. Skipping refresh.');
+    }
+}
+
+// Add this function to properly fetch and display the user name
+async function updateUserDisplay() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        const response = await fetch('/api/user', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                ...getRequestHeaders()
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch user data');
+        }
+
+        const userData = await response.json();
+        const userNameElement = document.getElementById('userName');
+        
+        if (userNameElement) {
+            // If it's a business name, split it appropriately
+            const displayName = userData.businessName || userData.name || 'Guest';
+            userNameElement.textContent = displayName;
+        }
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+    }
+}
+
+// Add logout handler
+function handleLogout() {
+    localStorage.removeItem('token');
+    window.location.href = 'login.html';
+}
+
+// Call this when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    updateUserDisplay();
+    
+    // Add scroll event listener with throttling
+    window.addEventListener('scroll', () => {
+        if (!scrollTimeout) {
+            scrollTimeout = setTimeout(() => {
+                handleTopBarVisibility();
+                scrollTimeout = null;
+            }, 100); // Throttle to every 100ms
+        }
+    });
+
+    // Show bar when mouse moves to top of screen
+    let mouseTimeout;
+    document.addEventListener('mousemove', (e) => {
+        if (e.clientY < 50) { // Mouse is near top of screen
+            const topBar = document.querySelector('.top-bar');
+            topBar.style.transform = 'translateY(0)';
+            isBarVisible = true;
+            
+            // Clear any existing timeout
+            clearTimeout(mouseTimeout);
+            
+            // Set new timeout to hide bar after mouse leaves
+            mouseTimeout = setTimeout(() => {
+                if (window.pageYOffset > SCROLL_THRESHOLD) {
+                    topBar.style.transform = 'translateY(-100%)';
+                    isBarVisible = false;
+                }
+            }, 2000); // Hide after 2 seconds if mouse leaves top area
+        }
+    });
+});

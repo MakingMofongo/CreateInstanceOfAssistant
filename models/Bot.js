@@ -29,12 +29,20 @@ const BotSchema = new mongoose.Schema({
   },
   deploymentName: {
     type: String,
-    required: true
+    required: true,
+    get: function(v) {
+      if (!v && this.serviceUrl) {
+        const urlParts = this.serviceUrl.split('//');
+        if (urlParts.length > 1) {
+          const hostParts = urlParts[1].split('.');
+          return hostParts[0];
+        }
+      }
+      return v;
+    }
   },
-  credentials: {
-    username: String,
-    password: String
-  },
+  username: String,
+  password: String,
   configuration: {
     prompt: String,
     additionalInfo: String
@@ -43,6 +51,9 @@ const BotSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  toJSON: { getters: true },
+  toObject: { getters: true }
 });
 
 module.exports = mongoose.model('Bot', BotSchema);

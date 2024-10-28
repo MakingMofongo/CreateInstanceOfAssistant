@@ -18,6 +18,9 @@ const Razorpay = require('razorpay');
 const { validateWebhookSignature } = require('razorpay/dist/utils/razorpay-utils');
 const os = require('os');
 
+// Add this near the other requires
+const botRoutes = require('./routes/bot');
+
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
@@ -173,6 +176,7 @@ app.post('/api/login', async (req, res) => {
 app.post('/create-bot', protect, upload.single('additionalInfo'), async (req, res) => {
     const requestId = generateRandomString();
     console.log('New bot creation request received. RequestId:', requestId, 'User:', req.user._id);
+    console.log('Form data received:', req.body); // Log the entire form data
     
     // Store session settings and create sendUpdate function
     const sessionSettings = req.headers['x-session-settings'];
@@ -181,11 +185,11 @@ app.post('/create-bot', protect, upload.single('additionalInfo'), async (req, re
     // Store the auth token along with other data
     const progressObject = { 
         sessionSettings: sessionSettings ? JSON.parse(sessionSettings) : null,
-        authToken: req.headers.authorization, // Store the auth token
+        authToken: req.headers.authorization,
         sendUpdate: (data) => {
             console.log('Warning: sendUpdate called before SSE connection established');
         },
-        isConnected: false // Add connection status flag
+        isConnected: false
     };
     console.log('Created progress object:', {
         ...progressObject,
@@ -198,20 +202,77 @@ app.post('/create-bot', protect, upload.single('additionalInfo'), async (req, re
     console.log('Sending initial response with requestId:', requestId);
     res.json({ requestId });
 
+
+    console.log('*****request body:', req.body);
     try {
-        // Log the form data we received
-        console.log('Form data received:', {
-            serviceName: req.body.serviceName,
-            name: req.body.name,
-            botType: req.body.botType,
-            hasFile: !!req.file
-        });
+        // Extract all required fields from form data
+        const {
+            hotelName,
+            hospitalName,
+            customAssistantName,
+            botType,
+            // Add these fields for prompt generation
+            hotelStars,
+            hotelRooms,
+            hotelAmenities,
+            hotelPolicies,
+            hospitalType,
+            hospitalDepartments,
+            hospitalBeds,
+            customIndustry,
+            customPurpose,
+            customTone,
+            customKnowledgeBase,
+            customGuidelines,
+        } = req.body;
+
+        // Determine the name based on bot type
+        let name;
+        let finalPrompt;
+
+        if (botType === 'Hotel') {
+            console.log('Generating hotel prompt');
+            console.log('Hotel name:', hotelName);
+            name = hotelName;
+            finalPrompt = generateHotelPrompt({
+                hotelName,
+                hotelStars,
+                hotelRooms,
+                hotelAmenities,
+                hotelPolicies
+            });
+        } else if (botType === 'Hospital') {
+            console.log('Generating hospital prompt');
+            console.log('Hospital name:', hospitalName);
+            name = hospitalName;
+            finalPrompt = generateHospitalPrompt({
+                hospitalName,
+                hospitalType,
+                hospitalDepartments,
+                hospitalBeds
+            });
+        } else if (botType === 'Custom') {
+            console.log('Generating custom prompt');
+            console.log('Custom assistant name:', customAssistantName);
+            name = customAssistantName;
+            finalPrompt = generateCustomPrompt({
+                assistantName: customAssistantName,
+                customIndustry,
+                customPurpose,
+                customTone,
+                customKnowledgeBase,
+                customGuidelines
+            });
+        }
+
+        console.log('Determined bot name:', name);
+        console.log('Generated prompt:', finalPrompt);
 
         // Wait for SSE connection to be established
         console.log('Waiting for SSE connection...');
         await new Promise((resolve, reject) => {
-            const maxWaitTime = 5000; // 5 seconds timeout
-            const checkInterval = 100; // Check every 100ms
+            const maxWaitTime = 5000;
+            const checkInterval = 100;
             let totalWaitTime = 0;
 
             const checkConnection = setInterval(() => {
@@ -229,15 +290,15 @@ app.post('/create-bot', protect, upload.single('additionalInfo'), async (req, re
 
         console.log('SSE connection established, starting bot creation...');
 
-        // Process the bot creation with user ID
+        // Process the bot creation with user ID and determined name
         const result = await processBotCreation(requestId, {
-            serviceName: req.body.serviceName,
-            name: req.body.name,
+            serviceName: name,
+            name: name,
             formData: req.body,
-            finalPrompt: req.body.finalPrompt,
+            finalPrompt: finalPrompt, // Use the generated prompt
             additionalInfo: req.file ? fs.readFileSync(req.file.path, 'utf8') : null,
             botType: req.body.botType,
-            userId: req.user._id  // Pass the user ID
+            userId: req.user._id
         });
 
         console.log('Bot creation completed successfully:', result);
@@ -367,6 +428,12 @@ app.get('/api/bots/:id', protect, async (req, res) => {
   }
 });
 
+// Add this near the other routes
+app.get('/new', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+});
+
+// Update the original route to keep serving the old version
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -431,7 +498,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 function generateHotelPrompt(data) {
-  return `You are the AI receptionist for ${data.hotelName}, fluent in every language. Speak in a ${data.hotelTone || 'friendly'} tone, and keep your responses short, precise, and conversational. Guide the caller with kindness, offering helpful advice to ensure they choose the best room.
+    return `You are the AI receptionist for ${data.hotelName || 'our hotel'}, a ${data.hotelStars || ''}-star hotel with ${data.hotelRooms || 'multiple'} rooms, fluent in every language. The hotel offers amenities such as ${data.hotelAmenities || 'standard hotel amenities'}. Speak in a friendly tone, and keep your responses short, precise, and conversational. Guide the caller with kindness, offering helpful advice to ensure they choose the best room.
 
 Our policies include: ${data.hotelPolicies || 'standard hotel policies'}
 
@@ -441,15 +508,15 @@ Start by asking the caller's name, and good luck!`;
 }
 
 function generateHospitalPrompt(data) {
-  return `You are the AI receptionist for ${data.hospitalName}, fluent in every language. Maintain a ${data.hospitalTone || 'compassionate and professional'} tone, ensuring clear and concise communication.
+    return `You are the AI receptionist for ${data.hospitalName || 'our hospital'}, a ${data.hospitalType || 'medical facility'} with ${data.hospitalBeds || 'multiple'} beds, fluent in every language. The hospital has departments including ${data.hospitalDepartments || 'various medical departments'}. Maintain a compassionate and professional tone, ensuring clear and concise communication.
 
-Do not provide medical advicerefer to professionals when necessary. Ensure all interactions are respectful and adhere to patient privacy guidelines.
+Do not provide medical advice—refer to professionals when necessary. Ensure all interactions are respectful and adhere to patient privacy guidelines.
 
 Begin by greeting the caller and asking how you can assist them today.`;
 }
 
 function generateCustomPrompt(data) {
-  return `You are ${data.assistantName}, a customized AI assistant for the ${data.customIndustry} industry, designed to ${data.customPurpose}. Your knowledge base is tailored to provide assistance in designated areas as specified by the user. Maintain a ${data.customTone || 'professional'} tone that aligns with the brand and purpose you are created for.
+    return `You are ${data.assistantName || 'an AI assistant'}, a customized AI assistant for the ${data.customIndustry || 'specified'} industry, designed to ${data.customPurpose || 'assist users'}. Your knowledge base is tailored to provide assistance in designated areas as specified by the user. Maintain a ${data.customTone || 'professional'} tone that aligns with the brand and purpose you are created for.
 
 ${data.customKnowledgeBase ? 'Your knowledge base includes: ' + data.customKnowledgeBase : ''}
 ${data.customGuidelines ? 'Please follow these guidelines: ' + data.customGuidelines : ''}
@@ -460,44 +527,44 @@ Start by introducing yourself and asking how you can help today.`;
 }
 
 function generateKnowledgeBaseContent(data, botType, additionalInfo) {
-    let content = '';
-    if (botType === 'Hotel') {
-        content += `Hotel Name: ${data.hotelName}\n`;
-        content += `Email: ${data.email}\n`;
-        content += `Country: ${data.country}\n`;  // Fixed: Added backticks
-        content += `Star Rating: ${data.hotelStars}\n`;
-        content += `Number of Rooms: ${data.hotelRooms}\n`;
-        content += `Amenities: ${data.hotelAmenities}\n`;
-        content += `Description: ${data.hotelDescription}\n`;
-        content += `Policies: ${data.hotelPolicies}\n`;
-        content += `Location: ${data.hotelLocation}\n`;
-    } else if (botType === 'Hospital') {
-        content += `Hospital Name: ${data.hospitalName}\n`;
-        content += `Email: ${data.email}\n`;
-        content += `Country: ${data.country}\n`;  // Fixed: Added backticks
-        content += `Hospital Type: ${data.hospitalType}\n`;
-        content += `Departments: ${data.hospitalDepartments}\n`;
-        content += `Number of Beds: ${data.hospitalBeds}\n`;
-        content += `Description: ${data.hospitalDescription}\n`;
-        content += `Services: ${data.hospitalServices}\n`;
-        content += `Location: ${data.hospitalLocation}\n`;
-    } else if (botType === 'Custom') {
-        content += `Assistant Name: ${data.assistantName}\n`;
-        content += `Email: ${data.email}\n`;
-        content += `Country: ${data.country}\n`;  // Fixed: Added backticks
-        content += `Industry: ${data.customIndustry}\n`;  // Fixed: Added backticks
-        content += `Purpose: ${data.customPurpose}\n`;  // Fixed: Added backticks
-        content += `Tone: ${data.customTone}\n`;  // Fixed: Added backticks
-        content += `Knowledge Base: ${data.customKnowledgeBase}\n`;  // Fixed: Added backticks
-        content += `Guidelines: ${data.customGuidelines}\n`;  // Fixed: Added backticks
-    }
+  let content = '';
+  if (botType === 'Hotel') {
+    content += `Hotel Name: ${data.hotelName}\n`;
+    content += `Email: ${data.email}\n`;
+    content += `Country: ${data.country}\n`;
+    content += `Star Rating: ${data.hotelStars}\n`;
+    content += `Number of Rooms: ${data.hotelRooms}\n`;
+    content += `Amenities: ${data.hotelAmenities}\n`;
+    content += `Description: ${data.hotelDescription}\n`;
+    content += `Policies: ${data.hotelPolicies}\n`;
+    content += `Location: ${data.hotelLocation}\n`;
+  } else if (botType === 'Hospital') {
+    content += `Hospital Name: ${data.hospitalName}\n`;
+    content += `Email: ${data.email}\n`;
+    content += `Country: ${data.country}\n`;
+    content += `Hospital Type: ${data.hospitalType}\n`;
+    content += `Departments: ${data.hospitalDepartments}\n`;
+    content += `Number of Beds: ${data.hospitalBeds}\n`;
+    content += `Description: ${data.hospitalDescription}\n`;
+    content += `Services: ${data.hospitalServices}\n`;
+    content += `Location: ${data.hospitalLocation}\n`;
+  } else if (botType === 'Custom') {
+    content += `Assistant Name: ${data.assistantName}\n`;
+    content += `Email: ${data.email}\n`;
+    content += `Country: ${data.country}\n`;
+    content += `Industry: ${data.customIndustry}\n`;
+    content += `Purpose: ${data.customPurpose}\n`;
+    content += `Tone: ${data.customTone}\n`;
+    content += `Knowledge Base: ${data.customKnowledgeBase}\n`;
+    content += `Guidelines: ${data.customGuidelines}\n`;
+  }
 
-    // Append additional info from uploaded file
-    if (additionalInfo) {
-        content += '\nAdditional Information:\n' + additionalInfo;
-    }
+  // Append additional info from uploaded file
+  if (additionalInfo) {
+    content += '\nAdditional Information:\n' + additionalInfo;
+  }
 
-    return content;
+  return content;
 }
 
 // Update the simulateProgress function to accept settings parameter
@@ -522,13 +589,29 @@ async function simulateProgress(sendUpdate, status, duration, settings) {
     }
 }
 
-// Update processBotCreation to properly handle settings
+// Update processBotCreation function to include database updates
 async function processBotCreation(requestId, { serviceName, name, formData, finalPrompt, additionalInfo, botType, userId }) {
+    console.log('Starting processBotCreation with parameters:', {
+        requestId,
+        serviceName,
+        name,
+        botType,
+        userId,
+        formDataLength: formData ? Object.keys(formData).length : 0,
+        hasAdditionalInfo: !!additionalInfo,
+        promptLength: finalPrompt ? finalPrompt.length : 0
+    });
+
+    console.log('Progress object:', {
+        exists: !!botCreationProgress.get(requestId),
+        hasSendUpdate: !!botCreationProgress.get(requestId)?.sendUpdate,
+        hasSessionSettings: !!botCreationProgress.get(requestId)?.sessionSettings
+    });
     const progress = botCreationProgress.get(requestId);
     const sendUpdate = progress?.sendUpdate;
     
     try {
-        // Get session settings from the progress object
+        // Get effective settings
         let effectiveSettings = {
             IS_MOCK: process.env.IS_MOCK === 'true',
             DISABLE_FAUX_TIMERS: process.env.DISABLE_FAUX_TIMERS === 'true'
@@ -538,21 +621,20 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
             try {
                 const settings = JSON.parse(progress.sessionSettings);
                 if (settings.isActive) {
-                    // Session settings override global settings
                     effectiveSettings = {
                         IS_MOCK: settings.IS_MOCK,
                         DISABLE_FAUX_TIMERS: settings.DISABLE_FAUX_TIMERS
                     };
-                    console.log('Using session settings for deployment:', effectiveSettings);
                 }
             } catch (error) {
                 console.error('Error parsing session settings:', error);
             }
         }
 
-        console.log('Final effective settings for deployment:', effectiveSettings);
+        console.log('Starting bot creation with settings:', effectiveSettings);
+        console.log('Bot details:', { serviceName, name, botType, userId });
 
-        // Create mock assistant data only if mock mode is enabled
+        // Create OpenAI assistant
         let assistant;
         if (effectiveSettings.IS_MOCK) {
             assistant = {
@@ -562,33 +644,32 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
             };
             console.log('Created mock assistant:', assistant);
         } else {
-            // Create real OpenAI assistant
-            console.log('Creating real OpenAI assistant...');
+            console.log('Creating OpenAI assistant...');
             assistant = await openai.beta.assistants.create({
                 name: name,
                 instructions: finalPrompt,
                 model: "gpt-4o",
                 tools: [{ type: "file_search" }],
             });
-            console.log('Created real assistant:', assistant);
+            console.log('Created OpenAI assistant:', assistant);
         }
 
-        // Initializing
+        // Initializing step
         sendUpdate({ status: 'Initializing', progress: 0 });
         await simulateProgress(sendUpdate, 'Initializing', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
         sendUpdate({ status: 'Initializing', progress: 100 });
 
-        // Creating Knowledge Base
+        // Creating Knowledge Base step
         sendUpdate({ status: 'Creating Knowledge Base', progress: 0 });
         await simulateProgress(sendUpdate, 'Creating Knowledge Base', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
         sendUpdate({ status: 'Creating Knowledge Base', progress: 100 });
 
-        // Training AI
+        // Training AI step
         sendUpdate({ status: 'Training AI', progress: 0 });
         await simulateProgress(sendUpdate, 'Training AI', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
         sendUpdate({ status: 'Training AI', progress: 100 });
 
-        // Cloud Setup
+        // Cloud Setup step
         sendUpdate({ status: 'Cloud Setup', progress: 0 });
         await simulateProgress(sendUpdate, 'Cloud Setup', effectiveSettings.IS_MOCK ? 1000 : 5000, effectiveSettings);
         
@@ -597,87 +678,105 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
         
         sendUpdate({ status: 'Cloud Setup', progress: 100 });
 
-        // Deployment
+        // Deployment step
         sendUpdate({ status: 'Deployment', progress: 0 });
         
+        let deploymentResult;
+        let credentials;
+        
         if (effectiveSettings.IS_MOCK) {
-            // Mock deployment process
             await simulateProgress(sendUpdate, 'Deployment', 1000, effectiveSettings);
-            const mockServiceUrl = `https://mock-service-${randomSuffix}.run.app`;
-            const mockCredentials = {
+            deploymentResult = {
+                serviceUrl: `https://mock-service-${randomSuffix}.run.app`,
+                deploymentName: deploymentName
+            };
+            credentials = {
                 username: 'mock_user_' + Math.random().toString(36).substring(7),
                 password: 'mock_pass_' + Math.random().toString(36).substring(7)
             };
-            
-            sendUpdate({ status: 'Deployment', progress: 100 });
-            
-            // Send completion with mock data
-            sendUpdate({ 
-                status: 'completed',
-                serviceUrl: mockServiceUrl,
-                phoneNumber: '+13394997114',
-                username: mockCredentials.username,
-                password: mockCredentials.password
-            });
-
-            return {
-                clonedServiceResult: { serviceUrl: mockServiceUrl },
-                assistant,
-                deployedUsername: mockCredentials.username,
-                deployedPassword: mockCredentials.password
-            };
         } else {
-            console.log('Starting real deployment process...');
-            // Real deployment process
+            console.log('Starting deployment process...');
             const emptyServiceResult = await deployment(deploymentName, null, randomSuffix, effectiveSettings);
             sendUpdate({ status: 'Deployment', progress: 33 });
-            console.log('Empty service deployed:', emptyServiceResult);
-
-            if (!emptyServiceResult.serviceUrl) {
-                throw new Error('Failed to get service URL from empty deployment');
-            }
-
-            // First clone the assistant
+            
             const cloneResult = await clone(assistant.id, emptyServiceResult.serviceUrl);
             sendUpdate({ status: 'Deployment', progress: 66 });
-            console.log('Clone result:', cloneResult);
-
-            // Then deploy the cloned folder
-            const clonedServiceResult = await deployment(
-                assistant.id,
-                cloneResult.folderName,
-                randomSuffix,
-                effectiveSettings
-            );
-
-            if (!clonedServiceResult.serviceUrl) {
-                throw new Error('Failed to get service URL from final deployment');
-            }
-
-            sendUpdate({ status: 'Deployment', progress: 100 });
-            console.log('Final deployment result:', clonedServiceResult);
-
-            // Send completion status with all required information
-            const completionData = {
-                status: 'completed',
-                serviceUrl: clonedServiceResult.serviceUrl,
-                phoneNumber: '+13394997114',
+            
+            deploymentResult = await deployment(deploymentName, cloneResult.folderName, randomSuffix, effectiveSettings);
+            credentials = {
                 username: cloneResult.username,
                 password: cloneResult.password
             };
-
-            console.log('Sending completion data:', completionData);
-            sendUpdate(completionData);
-
-            return {
-                clonedServiceResult,
-                assistant,
-                deployedUsername: cloneResult.username,
-                deployedPassword: cloneResult.password
-            };
         }
+        
+        sendUpdate({ status: 'Deployment', progress: 100 });
+
+        // Database Update step
+        sendUpdate({ status: 'Finalizing', progress: 0 });
+        console.log('Creating bot record in database...');
+        
+        const botData = {
+            name: name || serviceName, // Use name if provided, fall back to serviceName
+            type: botType,
+            serviceUrl: deploymentResult.serviceUrl,
+            phoneNumber: '+13394997114',
+            user: userId,
+            assistantId: assistant.id,
+            deploymentName: deploymentName,
+            username: credentials.username,
+            password: credentials.password,
+            configuration: {
+                prompt: finalPrompt || '', // Ensure prompt is never undefined
+                additionalInfo: additionalInfo || null
+            }
+        };
+
+        // Add validation before saving
+        if (!botData.name) {
+            console.error('Missing bot name:', { name, serviceName });
+            throw new Error('Bot name is required');
+        }
+
+        console.log('Bot data to be saved:', botData);
+
+        let savedBot; // Declare variable to store the saved bot
+        try {
+            const bot = new Bot(botData);
+            savedBot = await bot.save(); // Store the saved bot
+            console.log('Bot saved successfully:', savedBot._id);
+        } catch (error) {
+            console.error('Failed to save bot to database:', error);
+            throw new Error(`Database error: ${error.message}`);
+        }
+
+        sendUpdate({ status: 'Finalizing', progress: 100 });
+
+        // Send completion status
+        const completionData = {
+            status: 'completed',
+            serviceUrl: deploymentResult.serviceUrl,
+            phoneNumber: '+13394997114',
+            username: credentials.username,
+            password: credentials.password
+        };
+
+        console.log('Sending completion data:', completionData);
+        sendUpdate(completionData);
+
+        return {
+            deploymentResult,
+            assistant,
+            bot: savedBot // Use the saved bot here
+        };
+
     } catch (error) {
         console.error('Error in processBotCreation:', error);
+        if (sendUpdate) {
+            sendUpdate({ 
+                error: 'Failed to create bot: ' + error.message,
+                details: error.stack
+            });
+        }
         throw error;
     }
 }
@@ -1052,3 +1151,66 @@ app.get('/api/user', (req, res) => {
     });
 });
 
+// Add this with the other middleware
+app.use('/api', botRoutes);
+
+// Add these routes for the deployment console
+app.get('/deploy', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'deploy', 'deploy.html'));
+});
+
+// Add this route for the new version
+app.get('/new', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+});
+
+// Keep the original route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Add these routes for the dashboard
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard', 'dashboard.html'));
+});
+
+// Add this route to serve dashboard assets
+app.use('/dashboard', express.static(path.join(__dirname, 'public', 'dashboard')));
+
+// Add this route to serve shared files
+app.use('/shared', express.static(path.join(__dirname, 'public', 'shared')));
+
+// Add these routes for authentication pages
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'register.html'));
+});
+
+// Add this route for the shared auth file
+app.use('/shared', express.static(path.join(__dirname, 'public', 'shared')));
+
+// Add these routes for the deployment console
+app.get('/deploy', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'deploy', 'deploy.html'));
+});
+
+// Add this route for the new version
+app.get('/new', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+});
+
+// Keep the original route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Add these routes for the dashboard
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard', 'dashboard.html'));
+});
+
+// Add this route to serve dashboard assets
+app.use('/dashboard', express.static(path.join(__dirname, 'public', 'dashboard')));

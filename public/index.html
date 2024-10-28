@@ -15,26 +15,37 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <!-- Add this in the head section -->
     <link rel="stylesheet" href="session-indicator.css">
+    <link rel="stylesheet" href="bot-dashboard.css">
+    <!-- Add this line in the <head> section, before your other scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <!-- Remove or comment out the user bar section -->
-    <!-- <div id="user-bar" class="user-bar">
-        <div class="user-info">
-            <img src="https://api.dicebear.com/6.x/initials/svg?seed=JD" alt="User Avatar" class="user-avatar">
-            <span class="user-name">John Doe</span>
+    <!-- Add this right after the <body> tag -->
+    <div class="top-bar">
+        <div class="top-bar-content">
+            <div class="user-welcome">
+                <i class="fas fa-user-circle"></i>
+                <div class="welcome-text">
+                    <span>Welcome back,</span>
+                    <span class="user-name" id="userName">Loading...</span>
+                </div>
+            </div>
+            <div class="top-bar-actions">
+                <button class="action-button admin-button" onclick="window.location.href='admin.html'">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Admin</span>
+                </button>
+                <button class="action-button" onclick="window.location.href='settings.html'">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </button>
+                <button class="action-button logout-button" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
         </div>
-        <nav class="user-nav">
-            <button class="nav-item" data-action="account">
-                <i class="fas fa-user-circle"></i> Account
-            </button>
-            <button class="nav-item" data-action="settings">
-                <i class="fas fa-cog"></i> Settings
-            </button>
-            <button class="nav-item" data-action="logout">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-        </nav>
-    </div> -->
+    </div>
 
     <div class="container">
         <div class="logo">

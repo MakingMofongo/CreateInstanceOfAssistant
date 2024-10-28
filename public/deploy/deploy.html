@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOKO AI - Deployment Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles1.css">
+    <link rel="stylesheet" href="/deploy/deploy.css">
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+<div id="tsparticles"></div>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'koko-purple': {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Add this in the head section -->
+    <script src="/shared/auth.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Fixed Header -->
+    <header class="fixed top-0 w-full bg-white border-b border-gray-200 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="text-2xl font-bold">
+                        <span class="text-koko-purple-600">KOKO</span>
+                        <span class="text-gray-900">AI</span>
+                    </div>
+                </div>
+
+                <!-- User Info -->
+                <div class="flex items-center space-x-4">
+                    <div id="userSection" class="hidden">
+                        <span id="userName" class="text-gray-700"></span>
+                        <button onclick="handleLogout()" class="text-koko-purple-600 hover:text-koko-purple-700">
+                            <i class="fas fa-sign-out-alt mr-2"></i>
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mock Mode Indicator -->
+    <div id="mockModeIndicator" class="hidden fixed top-16 w-full bg-yellow-100 text-yellow-800 px-4 py-2 text-center">
+        Running in Mock Mode - No real deployments will be made
+    </div>
+
+    <!-- Main Content -->
+    <main class="pt-16">
+        <!-- Deployment Console -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Steps Progress -->
+            <div class="mb-8 bg-white border border-gray-200 p-4">
+                <div class="flex justify-between">
+                    <div class="step active" data-step="1">
+                        <div class="w-8 h-8 bg-koko-purple-600 text-white flex items-center justify-center">1</div>
+                        <div class="text-sm mt-1">Bot Type</div>
+                    </div>
+                    <div class="step" data-step="2">
+                        <div class="w-8 h-8 bg-gray-200 text-gray-600 flex items-center justify-center">2</div>
+                        <div class="text-sm mt-1">Configure</div>
+                    </div>
+                    <div class="step" data-step="3">
+                        <div class="w-8 h-8 bg-gray-200 text-gray-600 flex items-center justify-center">3</div>
+                        <div class="text-sm mt-1">Plan</div>
+                    </div>
+                    <div class="step" data-step="4">
+                        <div class="w-8 h-8 bg-gray-200 text-gray-600 flex items-center justify-center">4</div>
+                        <div class="text-sm mt-1">Deploy</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Split Panel Layout -->
+            <div class="grid grid-cols-12 gap-6">
+                <!-- Main Form Area -->
+                <div class="col-span-12 lg:col-span-8">
+                    <div class="bg-white border border-gray-200">
+                        <!-- Form Content -->
+                        <div id="formContent" class="p-6">
+                            <!-- Dynamic form content will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Panel -->
+                <div class="col-span-12 lg:col-span-4">
+                    <div class="bg-white border border-gray-200 p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Live Preview</h3>
+                        <div id="livePrompt" class="font-mono text-sm bg-gray-50 p-4 h-96 overflow-y-auto">
+                            Select a bot type to see the preview...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deployment Progress Section -->
+            <div id="deploymentProgress" class="hidden">
+                <div class="max-w-3xl mx-auto bg-white border border-gray-200 p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Deploying Your AI Receptionist</h2>
+                    
+                    <!-- Progress Steps -->
+                    <div class="space-y-8" id="progressSteps">
+                        <!-- Steps will be dynamically inserted here -->
+                    </div>
+
+                    <!-- Deployment Complete Section -->
+                    <div id="deploymentComplete" class="hidden mt-8">
+                        <div class="bg-green-50 border border-green-200 p-6">
+                            <div class="flex items-center mb-4">
+                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-check text-2xl text-green-600"></i>
+                                </div>
+                                <h3 class="ml-4 text-lg font-medium text-green-900">Deployment Complete!</h3>
+                            </div>
+
+                            <!-- Credentials Section -->
+                            <div class="mt-6 space-y-4" id="deploymentCredentials">
+                                <div class="bg-white p-4 border border-green-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Phone Number</span>
+                                        <span class="text-sm text-gray-900" id="deployedPhoneNumber"></span>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-4 border border-green-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Service URL</span>
+                                        <a href="#" class="text-sm text-koko-purple-600 hover:text-koko-purple-700" id="deployedServiceUrl" target="_blank"></a>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-4 border border-green-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Username</span>
+                                        <span class="text-sm text-gray-900" id="deployedUsername"></span>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-4 border border-green-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Password</span>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-sm text-gray-900" id="deployedPassword">••••••••</span>
+                                            <button onclick="togglePassword('deployed')" class="text-koko-purple-600 hover:text-koko-purple-700">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Warning Message -->
+                            <div class="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-yellow-700">
+                                            Please save these credentials securely. They will not be shown again.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="mt-6 flex justify-end space-x-4">
+                                <button onclick="copyCredentials()" class="btn-secondary">
+                                    <i class="fas fa-copy mr-2"></i>
+                                    Copy Credentials
+                                </button>
+                                <button onclick="viewDashboard()" class="btn-primary">
+                                    <i class="fas fa-tachometer-alt mr-2"></i>
+                                    Go to Dashboard
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plan Selection Section -->
+            <template id="planSelectionTemplate">
+                <div class="space-y-8">
+                    <div class="text-center">
+                        <h3 class="text-lg font-medium text-gray-900">Choose Your Plan</h3>
+                        <div class="mt-4 flex justify-center items-center space-x-4">
+                            <span class="text-gray-600">Monthly</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="pricingToggle" class="sr-only peer">
+                                <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-koko-purple-600"></div>
+                            </label>
+                            <span class="text-gray-600">Yearly <span class="text-koko-purple-600 text-sm">(Save 20%)</span></span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Basic Plan -->
+                        <div class="bg-white p-6 border border-gray-200">
+                            <h4 class="text-xl font-semibold text-gray-900">Basic</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-bold" data-monthly="49.99" data-yearly="479.99">€49.99</span>
+                                <span class="ml-1 text-xl text-gray-500">/month</span>
+                            </div>
+                            <ul class="mt-6 space-y-4">
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    2 AI Receptionists
+                                </li>
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    Basic Support
+                                </li>
+                            </ul>
+                            <button class="mt-8 w-full btn-primary" data-plan="basic" data-amount="4999">
+                                Select Plan
+                            </button>
+                        </div>
+
+                        <!-- Professional Plan -->
+                        <div class="bg-white p-6 border-2 border-koko-purple-600 relative">
+                            <div class="absolute top-0 right-0 bg-koko-purple-600 text-white px-3 py-1 text-sm">
+                                Most Popular
+                            </div>
+                            <h4 class="text-xl font-semibold text-gray-900">Professional</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-bold" data-monthly="149.99" data-yearly="1439.99">€149.99</span>
+                                <span class="ml-1 text-xl text-gray-500">/month</span>
+                            </div>
+                            <ul class="mt-6 space-y-4">
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    5 AI Receptionists
+                                </li>
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    Priority Support
+                                </li>
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    Advanced Analytics
+                                </li>
+                            </ul>
+                            <button class="mt-8 w-full btn-primary" data-plan="professional" data-amount="14999">
+                                Select Plan
+                            </button>
+                        </div>
+
+                        <!-- Enterprise Plan -->
+                        <div class="bg-white p-6 border border-gray-200">
+                            <h4 class="text-xl font-semibold text-gray-900">Enterprise</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-bold" data-monthly="299.99" data-yearly="2879.99">€299.99</span>
+                                <span class="ml-1 text-xl text-gray-500">/month</span>
+                            </div>
+                            <ul class="mt-6 space-y-4">
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    Unlimited AI Receptionists
+                                </li>
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    24/7 Support
+                                </li>
+                                <li class="flex items-center">
+                                    <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                    Custom Integration
+                                </li>
+                            </ul>
+                            <button class="mt-8 w-full btn-primary" data-plan="enterprise" data-amount="29999">
+                                Select Plan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <!-- Context Actions Bar -->
+    <div id="contextActions" class="fixed bottom-0 w-full bg-white border-t border-gray-200 hidden">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <!-- Dynamic buttons will be inserted here -->
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
+
+    <!-- Update the script src path -->
+    <script src="/deploy/deploy.js"></script>
+</body>
+</html>

@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     backButton.className = 'back-button';
     backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Back';
     backButton.onclick = () => {
-        const previousPage = sessionStorage.getItem('previousPage') || 'index.html';
+        const previousPage = sessionStorage.getItem('previousPage') || 'index1.html';
         window.location.replace(previousPage);
     };
     document.querySelector('.admin-header').prepend(backButton);

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOKO AI - Enterprise AI Receptionist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="styles1.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'koko-purple': {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Add this in the head section -->
+    <script src="/shared/auth.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Fixed Header -->
+    <header class="fixed top-0 w-full bg-white border-b border-gray-200 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="text-2xl font-bold">
+                        <span class="text-koko-purple-600">KOKO</span>
+                        <span class="text-gray-900">AI</span>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <nav class="hidden md:flex space-x-8">
+                    <a href="#features" class="text-gray-600 hover:text-gray-900">Features</a>
+                    <a href="#pricing" class="text-gray-600 hover:text-gray-900">Pricing</a>
+                    <a href="/dashboard" class="text-gray-600 hover:text-gray-900">Dashboard</a>
+                </nav>
+
+                <!-- Auth Buttons -->
+                <div class="flex items-center space-x-4">
+                    <div id="userSection" class="hidden">
+                        <span id="userName" class="text-gray-700"></span>
+                        <button onclick="handleLogout()" class="text-koko-purple-600 hover:text-koko-purple-700">
+                            <i class="fas fa-sign-out-alt mr-2"></i>
+                            Logout
+                        </button>
+                    </div>
+                    <div id="authButtons" class="hidden">
+                        <button onclick="location.href='/login'" class="btn-secondary">Sign In</button>
+                        <button onclick="location.href='/signup'" class="btn-primary">Sign Up</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pt-16">
+        <!-- Hero Section -->
+        <section class="bg-white py-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center">
+                    <h1 class="text-4xl font-bold text-gray-900 sm:text-5xl md:text-6xl">
+                        <span class="block">Next Generation</span>
+                        <span class="block text-koko-purple-600">AI Receptionist</span>
+                    </h1>
+                    <p class="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+                        The only AI receptionist with real-time language switching and sub-second response times.
+                    </p>
+                    <div class="mt-8 flex justify-center space-x-4">
+                        <button onclick="location.href='/deploy'" class="btn-primary px-8 py-3">
+                            <i class="fas fa-terminal mr-2"></i>
+                            Launch Deployment Console
+                        </button>
+                        <button onclick="location.href='/dashboard'" class="btn-secondary px-8 py-3">
+                            <i class="fas fa-tachometer-alt mr-2"></i>
+                            View Dashboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="py-20 bg-gray-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Main Features -->
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-bold text-gray-900">Why Choose KOKO AI?</h2>
+                    <p class="mt-4 text-lg text-gray-600">Industry-leading features that set us apart</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Multilingual Feature -->
+                    <div class="bg-white p-6 border border-gray-200">
+                        <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
+                            <i class="fas fa-language text-xl text-koko-purple-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">Real-time Language Switching</h3>
+                        <p class="mt-2 text-gray-600">Switch languages instantly during calls without any interruption or delay.</p>
+                        <ul class="mt-4 space-y-2 text-sm text-gray-500">
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Supports 95+ languages
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Instant language detection
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Natural accent adaptation
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Speed Feature -->
+                    <div class="bg-white p-6 border border-gray-200">
+                        <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
+                            <i class="fas fa-bolt text-xl text-koko-purple-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">Sub-Second Response Time</h3>
+                        <p class="mt-2 text-gray-600">Industry-leading response times for natural conversations.</p>
+                        <ul class="mt-4 space-y-2 text-sm text-gray-500">
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                &lt;1 second response time
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Zero cold starts
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Global edge deployment
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Customization Feature -->
+                    <div class="bg-white p-6 border border-gray-200">
+                        <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
+                            <i class="fas fa-wand-magic-sparkles text-xl text-koko-purple-600"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">Deep Customization</h3>
+                        <p class="mt-2 text-gray-600">Tailor your AI receptionist to match your brand perfectly.</p>
+                        <ul class="mt-4 space-y-2 text-sm text-gray-500">
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Custom voice & tone
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Industry-specific training
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                Flexible workflow adaptation
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Pricing Section -->
+                <section id="pricing" class="py-20 bg-white">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-16">
+                            <h2 class="text-3xl font-bold text-gray-900">Simple, Transparent Pricing</h2>
+                            <p class="mt-4 text-lg text-gray-600">Choose the perfect plan for your business</p>
+                        </div>
+
+                        <!-- Pricing Toggle -->
+                        <div class="flex justify-center items-center space-x-4 mb-8">
+                            <span class="text-gray-600">Monthly</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="pricingToggle" class="sr-only peer">
+                                <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-koko-purple-600"></div>
+                            </label>
+                            <span class="text-gray-600">Yearly <span class="text-koko-purple-600 text-sm">(Save 20%)</span></span>
+                        </div>
+
+                        <!-- Pricing Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <!-- Basic Plan -->
+                            <div class="bg-white p-8 border border-gray-200 relative">
+                                <h3 class="text-xl font-semibold text-gray-900">Basic</h3>
+                                <div class="mt-4 flex items-baseline">
+                                    <span class="text-4xl font-bold tracking-tight text-gray-900" data-monthly="49.99" data-yearly="479.99">€49.99</span>
+                                    <span class="ml-1 text-xl font-semibold text-gray-500">/month</span>
+                                </div>
+                                <ul class="mt-6 space-y-4">
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        2 AI Receptionists
+                                    </li>
+                                    <!-- Add more features -->
+                                </ul>
+                                <button class="mt-8 w-full bg-koko-purple-600 text-white py-2 px-4 hover:bg-koko-purple-700 transition-colors duration-200" data-plan="basic" data-amount="4999">
+                                    Select Plan
+                                </button>
+                            </div>
+
+                            <!-- Pro Plan -->
+                            <div class="bg-white p-8 border-2 border-koko-purple-600 relative transform scale-105">
+                                <div class="absolute top-0 right-0 bg-koko-purple-600 text-white px-3 py-1 text-sm">
+                                    Most Popular
+                                </div>
+                                <h3 class="text-xl font-semibold text-gray-900">Professional</h3>
+                                <div class="mt-4 flex items-baseline">
+                                    <span class="text-4xl font-bold tracking-tight text-gray-900" data-monthly="149.99" data-yearly="1439.99">€149.99</span>
+                                    <span class="ml-1 text-xl font-semibold text-gray-500">/month</span>
+                                </div>
+                                <ul class="mt-6 space-y-4">
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        5 AI Receptionists
+                                    </li>
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        Priority Support
+                                    </li>
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        Custom Voice Training
+                                    </li>
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        Advanced Analytics
+                                    </li>
+                                </ul>
+                                <button class="mt-8 w-full bg-koko-purple-600 text-white py-2 px-4 hover:bg-koko-purple-700 transition-colors duration-200" data-plan="professional" data-amount="14999">
+                                    Select Plan
+                                </button>
+                            </div>
+
+                            <!-- Enterprise Plan -->
+                            <div class="bg-white p-8 border border-gray-200 relative">
+                                <h3 class="text-xl font-semibold text-gray-900">Enterprise</h3>
+                                <div class="mt-4 flex items-baseline">
+                                    <span class="text-4xl font-bold tracking-tight text-gray-900" data-monthly="299.99" data-yearly="2879.99">€299.99</span>
+                                    <span class="ml-1 text-xl font-semibold text-gray-500">/month</span>
+                                </div>
+                                <ul class="mt-6 space-y-4">
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        Unlimited AI Receptionists
+                                    </li>
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        24/7 Dedicated Support
+                                    </li>
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        Custom Integration
+                                    </li>
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
+                                        SLA Guarantee
+                                    </li>
+                                </ul>
+                                <button class="mt-8 w-full bg-koko-purple-600 text-white py-2 px-4 hover:bg-koko-purple-700 transition-colors duration-200" data-plan="enterprise" data-amount="29999">
+                                    Select Plan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
+
+    <script src="script1.js"></script>
+</body>
+</html>

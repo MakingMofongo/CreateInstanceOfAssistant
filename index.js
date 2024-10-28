@@ -47,7 +47,7 @@ if (!fs.existsSync(path.join(__dirname, '..', 'orders.json'))) {
 
 // Root route to serve index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'index1.html'));
 });
 
 // Route to handle order creation

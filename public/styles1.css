@@ -1,0 +1,138 @@
+/* Custom styles to complement Tailwind */
+
+/* Transitions */
+.transition-height {
+    transition: max-height 0.3s ease-in-out;
+}
+
+/* Progress steps */
+.progress-step {
+    @apply relative pb-8;
+}
+
+.progress-step:last-child {
+    @apply pb-0;
+}
+
+.progress-step:before {
+    content: '';
+    @apply absolute left-4 top-8 bottom-0 w-0.5 bg-gray-200;
+}
+
+.progress-step:last-child:before {
+    @apply hidden;
+}
+
+.progress-step.active .progress-number {
+    @apply bg-koko-purple-600 text-white;
+}
+
+.progress-step.completed .progress-number {
+    @apply bg-green-500 text-white;
+}
+
+/* Form elements */
+.form-input {
+    @apply mt-1 block w-full border border-gray-300 px-3 py-2;
+    @apply focus:border-koko-purple-500 focus:ring-1 focus:ring-koko-purple-500;
+    @apply disabled:bg-gray-100 disabled:cursor-not-allowed;
+}
+
+.form-select {
+    @apply mt-1 block w-full border border-gray-300 px-3 py-2 pr-8;
+    @apply focus:border-koko-purple-500 focus:ring-1 focus:ring-koko-purple-500;
+    @apply disabled:bg-gray-100 disabled:cursor-not-allowed;
+}
+
+/* Buttons */
+.btn {
+    @apply px-4 py-2 font-medium transition-colors duration-200;
+}
+
+.btn-primary {
+    @apply bg-koko-purple-600 text-white;
+    @apply hover:bg-koko-purple-700;
+    @apply focus:outline-none focus:ring-2 focus:ring-koko-purple-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+    @apply bg-white text-gray-700 border border-gray-300;
+    @apply hover:bg-gray-50;
+    @apply focus:outline-none focus:ring-2 focus:ring-koko-purple-500 focus:ring-offset-2;
+}
+
+/* Cards */
+.card {
+    @apply bg-white border border-gray-200 p-6;
+}
+
+/* Pricing cards */
+.pricing-card {
+    @apply relative bg-white border border-gray-200 p-6;
+    @apply transition-all duration-200;
+}
+
+.pricing-card:hover {
+    @apply border-koko-purple-500 shadow-lg;
+}
+
+.pricing-card.selected {
+    @apply border-koko-purple-500 ring-2 ring-koko-purple-500;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease-in-out;
+}
+
+/* Utilities */
+.hidden {
+    display: none !important;
+}
+
+/* Session indicator */
+.session-indicator {
+    @apply fixed top-4 right-4 bg-white border border-gray-200 shadow-lg rounded;
+    @apply transition-all duration-300 transform;
+}
+
+/* Toast notifications */
+.toast {
+    @apply fixed bottom-4 right-4 bg-white border border-gray-200 shadow-lg rounded p-4;
+    @apply transition-all duration-300 transform;
+}
+
+.toast-success {
+    @apply border-green-500 bg-green-50;
+}
+
+.toast-error {
+    @apply border-red-500 bg-red-50;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .pricing-cards {
+        @apply grid-cols-1;
+    }
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        @apply grid-cols-1;
+    }
+}
