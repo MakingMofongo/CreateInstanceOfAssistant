@@ -1,515 +1,1003 @@
-// Global state management
-const state = {
-    currentStep: 1,
-    formData: {},
-    selectedPlan: null,
-    selectedAmount: 0,
-    isDeploymentOngoing: false,
-    currentRequestId: null,
-    eventSource: null
-};
+// Initialize GSAP ScrollTrigger
+gsap.registerPlugin(ScrollTrigger);
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    await checkAuthStatus();
-    initializeForm();
-    initializePricing();
-    initializeSteps();
-    setupEventListeners();
-    checkMockMode();
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAnimations();
+    initializeNavigation();
+    initializePricingToggle();
+    initializeParallaxEffects();
+    initializeIntersectionObserver();
+    setupMobileMenu();
+    initializeTrialButtons();
+    initializeConversationSets();
+    initializeAudioDemos();
 });
 
-// Authentication and User Management
-async function checkAuthStatus() {
-    const token = localStorage.getItem('token');
-    if (!token && process.env.IS_MOCK !== 'true') {
-        window.location.href = '/login';
-        return;
-    }
-    await updateUserDisplay();
-}
+// Navigation and Scroll Handling
+function initializeNavigation() {
+    const nav = document.getElementById('mainNav');
+    let lastScroll = 0;
 
-async function updateUserDisplay() {
-    try {
-        const response = await fetch('/api/user', {
-            headers: { 
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                ...getRequestHeaders()
+    window.addEventListener('scroll', () => {
+        const currentScroll = window.pageYOffset;
+        
+        // Add/remove background and shadow based on scroll position
+        if (currentScroll > 50) {
+            nav.classList.add('bg-white/95', 'shadow-md');
+            nav.classList.remove('bg-white/80');
+        } else {
+            nav.classList.remove('bg-white/95', 'shadow-md');
+            nav.classList.add('bg-white/80');
+        }
+
+        // Hide/show nav based on scroll direction
+        if (currentScroll > lastScroll && currentScroll > 500) {
+            nav.style.transform = 'translateY(-100%)';
+        } else {
+            nav.style.transform = 'translateY(0)';
+        }
+        lastScroll = currentScroll;
+    });
+
+    // Smooth scroll for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
             }
         });
-        const userData = await response.json();
-        
-        const userSection = document.getElementById('userSection');
-        const authButtons = document.getElementById('authButtons');
-        const userName = document.getElementById('userName');
-
-        if (userData.name) {
-            userSection.classList.remove('hidden');
-            authButtons.classList.add('hidden');
-            userName.textContent = userData.name;
-        } else {
-            userSection.classList.add('hidden');
-            authButtons.classList.remove('hidden');
-        }
-    } catch (error) {
-        console.error('Error fetching user data:', error);
-    }
+    });
 }
 
-// Mock Mode Check
-async function checkMockMode() {
-    try {
-        const response = await fetch('/api/check-mock-mode');
-        const { isMock } = await response.json();
-        const indicator = document.getElementById('mockModeIndicator');
-        if (isMock) {
-            indicator.classList.remove('hidden');
-        }
-    } catch (error) {
-        console.error('Error checking mock mode:', error);
-    }
-}
+// GSAP Animations
+function initializeAnimations() {
+    // Hero section animations
+    gsap.from('.hero-content > *', {
+        opacity: 0,
+        y: 30,
+        duration: 1,
+        stagger: 0.2,
+        ease: 'power3.out'
+    });
 
-// Form Initialization and Management
-function initializeForm() {
-    const form = document.getElementById('createBotForm');
-    if (!form) return;
-
-    // Create bot type selection cards
-    const botTypes = [
-        {
-            id: 'hotel',
-            title: 'Hotel Receptionist',
-            description: 'Perfect for hotels, resorts, and hospitality businesses',
-            icon: 'hotel'
-        },
-        {
-            id: 'hospital',
-            title: 'Hospital Receptionist',
-            description: 'Ideal for hospitals, clinics, and healthcare facilities',
-            icon: 'hospital'
-        },
-        {
-            id: 'custom',
-            title: 'Custom Assistant',
-            description: 'Build a custom AI receptionist for any industry',
-            icon: 'robot'
-        }
-    ];
-
-    const typeSelection = document.createElement('div');
-    typeSelection.className = 'grid grid-cols-1 md:grid-cols-3 gap-6';
-    typeSelection.innerHTML = botTypes.map(type => `
-        <div class="bot-type-card cursor-pointer border border-gray-200 p-6 hover:border-koko-purple-600 transition-all"
-             data-type="${type.id}">
-            <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
-                <i class="fas fa-${type.icon} text-xl text-koko-purple-600"></i>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900">${type.title}</h3>
-            <p class="mt-2 text-gray-600">${type.description}</p>
-        </div>
-    `).join('');
-
-    // Add click handlers
-    typeSelection.querySelectorAll('.bot-type-card').forEach(card => {
-        card.addEventListener('click', () => {
-            // Remove selection from all cards
-            typeSelection.querySelectorAll('.bot-type-card').forEach(c => 
-                c.classList.remove('border-koko-purple-600', 'ring-2', 'ring-koko-purple-600'));
-            
-            // Add selection to clicked card
-            card.classList.add('border-koko-purple-600', 'ring-2', 'ring-koko-purple-600');
-            
-            // Store selected type
-            state.formData.botType = card.dataset.type;
-            
-            // Show continue button
-            showContextAction('Continue to Configuration', () => showStep(2));
+    // Feature cards animation
+    gsap.utils.toArray('.feature-card').forEach((card, i) => {
+        gsap.from(card, {
+            scrollTrigger: {
+                trigger: card,
+                start: 'top bottom-=100',
+                toggleActions: 'play none none reverse'
+            },
+            opacity: 0,
+            y: 50,
+            duration: 0.8,
+            delay: i * 0.2
         });
     });
 
-    form.appendChild(typeSelection);
-}
-
-// Step Management
-function initializeSteps() {
-    const steps = [
-        { number: 1, label: 'Type' },
-        { number: 2, label: 'Details' },
-        { number: 3, label: 'Plan' },
-        { number: 4, label: 'Deploy' }
-    ];
-
-    const stepsContainer = document.querySelector('[data-steps]');
-    if (stepsContainer) {
-        stepsContainer.innerHTML = steps.map(step => `
-            <div class="step ${step.number === 1 ? 'active' : ''}" data-step="${step.number}">
-                <div class="step-number">${step.number}</div>
-                <div class="step-label">${step.label}</div>
-            </div>
-        `).join('');
-    }
-}
-
-function showStep(stepNumber) {
-    // Update step indicators
-    const steps = document.querySelectorAll('[data-step]');
-    steps.forEach(step => {
-        const isActive = parseInt(step.dataset.step) === stepNumber;
-        step.classList.toggle('active', isActive);
-        if (isActive) {
-            step.classList.add('bg-koko-purple-600', 'text-white');
-        } else {
-            step.classList.remove('bg-koko-purple-600', 'text-white');
-        }
+    // Technology stack animation
+    gsap.from('.tech-stack img', {
+        scrollTrigger: {
+            trigger: '.tech-stack',
+            start: 'top center+=100'
+        },
+        opacity: 0,
+        y: 20,
+        duration: 0.5,
+        stagger: 0.1
     });
-
-    // Show/hide appropriate content
-    if (stepNumber === 1) {
-        // Show bot type selection
-        document.getElementById('createBotForm').classList.remove('hidden');
-        document.getElementById('pricing').classList.add('hidden');
-        document.getElementById('deploymentProgress').classList.add('hidden');
-    } else if (stepNumber === 2) {
-        // Show pricing section
-        document.getElementById('createBotForm').classList.add('hidden');
-        document.getElementById('pricing').classList.remove('hidden');
-        document.getElementById('deploymentProgress').classList.add('hidden');
-        // Initialize pricing toggle if not already done
-        initializePricing();
-    } else if (stepNumber === 3) {
-        // Show deployment progress
-        document.getElementById('createBotForm').classList.add('hidden');
-        document.getElementById('pricing').classList.add('hidden');
-        document.getElementById('deploymentProgress').classList.remove('hidden');
-        startDeployment();
-    }
-
-    state.currentStep = stepNumber;
 }
 
-// Pricing Management
-function initializePricing() {
-    const toggle = document.getElementById('pricingToggle');
+// Pricing Toggle
+function initializePricingToggle() {
+    const toggle = document.getElementById('billingToggle');
+    
     if (toggle) {
-        toggle.addEventListener('change', updatePricing);
+        toggle.addEventListener('change', () => {
+            const isAnnual = toggle.checked;
+            
+            document.querySelectorAll('[data-plan]').forEach(card => {
+                const priceAmount = card.querySelector('.price-amount');
+                const pricePeriod = card.querySelector('.price-period');
+                const annualPrice = card.querySelector('.annual-price');
+                const monthlyPrice = card.querySelector('.monthly-price');
+                
+                if (priceAmount && pricePeriod && annualPrice && monthlyPrice) {
+                    if (isAnnual) {
+                        priceAmount.textContent = annualPrice.textContent;
+                        pricePeriod.textContent = '/year';
+                    } else {
+                        priceAmount.textContent = monthlyPrice.textContent;
+                        pricePeriod.textContent = '/month';
+                    }
+                }
+            });
+        });
     }
+}
 
-    document.querySelectorAll('[data-plan]').forEach(button => {
-        button.addEventListener('click', selectPlan);
+// Parallax Effects
+function initializeParallaxEffects() {
+    document.addEventListener('mousemove', (e) => {
+        const cards = document.querySelectorAll('.parallax-card');
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+
+        cards.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            const cardX = rect.left + rect.width / 2;
+            const cardY = rect.top + rect.height / 2;
+
+            const angleX = (mouseY - cardY) / 30;
+            const angleY = (mouseX - cardX) / -30;
+
+            card.style.transform = `perspective(1000px) rotateX(${angleX}deg) rotateY(${angleY}deg)`;
+        });
     });
 }
 
-function updatePricing(e) {
-    const isYearly = e.target.checked;
-    const prices = {
-        basic: { monthly: '49.99', yearly: '479.99' },
-        professional: { monthly: '149.99', yearly: '1439.99' },
-        enterprise: { monthly: '299.99', yearly: '2879.99' }
-    };
+// Intersection Observer for Fade-in Effects
+function initializeIntersectionObserver() {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.1 });
 
-    // Update all price displays
-    document.querySelectorAll('[data-plan]').forEach(card => {
-        const plan = card.getAttribute('data-plan');
-        const priceElement = card.querySelector('.text-4xl');
-        const periodElement = card.querySelector('.text-xl');
-        
-        if (priceElement && periodElement) {
-            priceElement.textContent = '€' + prices[plan][isYearly ? 'yearly' : 'monthly'];
-            periodElement.textContent = isYearly ? '/year' : '/month';
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+}
+
+// Mobile Menu
+function setupMobileMenu() {
+    const menuButton = document.getElementById('mobileMenuButton');
+    const mobileMenu = document.getElementById('mobileMenu');
+
+    if (menuButton && mobileMenu) {
+        menuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+            // Add slide animation
+            if (!mobileMenu.classList.contains('hidden')) {
+                gsap.from(mobileMenu, {
+                    height: 0,
+                    opacity: 0,
+                    duration: 0.3,
+                    ease: 'power2.out'
+                });
+            }
+        });
+    }
+}
+
+// Language Switch Animation
+function initializeLanguageSwitch() {
+    const languages = [
+        'English → Español',
+        'Français → 日本',
+        'Deutsche → 中文',
+        'Русский → العربية'
+    ];
+    let currentIndex = 0;
+
+    setInterval(() => {
+        const demo = document.querySelector('.language-switch-demo');
+        if (demo) {
+            gsap.to(demo, {
+                opacity: 0,
+                y: -20,
+                duration: 0.3,
+                onComplete: () => {
+                    currentIndex = (currentIndex + 1) % languages.length;
+                    demo.textContent = languages[currentIndex];
+                    gsap.to(demo, {
+                        opacity: 1,
+                        y: 0,
+                        duration: 0.3
+                    });
+                }
+            });
         }
-    });
+    }, 3000);
 }
 
-function selectPlan(e) {
-    const button = e.currentTarget;
-    const card = button.closest('.pricing-card');
-    
-    // Remove selection from all cards
-    document.querySelectorAll('.pricing-card').forEach(c => {
-        c.classList.remove('border-koko-purple-600', 'ring-2', 'ring-koko-purple-600');
-    });
-    
-    // Add selection to clicked card
-    card.classList.add('border-koko-purple-600', 'ring-2', 'ring-koko-purple-600');
-    
-    // Store selected plan data
-    state.selectedPlan = button.dataset.plan;
-    state.selectedAmount = parseInt(button.dataset.amount);
-    
-    // Show continue button
-    const continuePayment = document.querySelector('.continue-payment');
-    if (continuePayment) {
-        continuePayment.classList.remove('hidden');
+// Call Demo Button Effect
+function initializeCallButton() {
+    const callButton = document.querySelector('.call-demo-btn');
+    if (callButton) {
+        callButton.addEventListener('mouseenter', () => {
+            gsap.to(callButton, {
+                scale: 1.05,
+                duration: 0.3,
+                ease: 'back.out(1.7)'
+            });
+        });
+
+        callButton.addEventListener('mouseleave', () => {
+            gsap.to(callButton, {
+                scale: 1,
+                duration: 0.3,
+                ease: 'power2.out'
+            });
+        });
     }
 }
 
-// Live Preview Management
-function updateLivePrompt() {
-    const livePrompt = document.getElementById('livePrompt');
-    if (!livePrompt) return;
-
-    const formData = new FormData(document.getElementById('createBotForm'));
-    const data = Object.fromEntries(formData.entries());
+// Initialize everything
+window.addEventListener('load', () => {
+    initializeLanguageSwitch();
+    initializeCallButton();
     
-    let promptText = '';
-    switch (data.botType) {
-        case 'hotel':
-            promptText = generateHotelPrompt(data);
-            break;
-        case 'hospital':
-            promptText = generateHospitalPrompt(data);
-            break;
-        case 'custom':
-            promptText = generateCustomPrompt(data);
-            break;
-        default:
-            promptText = 'Select a bot type to see the preview...';
-    }
+    // Add smooth reveal for sections
+    gsap.utils.toArray('section').forEach(section => {
+        gsap.from(section, {
+            scrollTrigger: {
+                trigger: section,
+                start: 'top 80%',
+                toggleActions: 'play none none reverse'
+            },
+            opacity: 0,
+            y: 50,
+            duration: 1,
+            ease: 'power3.out'
+        });
+    });
+});
 
-    livePrompt.innerHTML = promptText;
+// Handle phone call
+function handlePhoneCall() {
+    window.location.href = 'tel:+13394997114';
 }
 
-// Deployment Management
-async function startDeployment() {
-    const deploymentSection = document.getElementById('deploymentProgress');
-    deploymentSection.classList.remove('hidden');
+// Add this to handle the FAQ section
+function initializeFAQ() {
+    const faqQuestions = document.querySelectorAll('.faq-question');
     
-    initializeProgressSteps();
-    await startBotCreation();
+    faqQuestions.forEach(question => {
+        question.addEventListener('click', () => {
+            const answer = question.nextElementSibling;
+            const icon = question.querySelector('i');
+            
+            // Toggle answer visibility
+            gsap.to(answer, {
+                height: answer.classList.contains('hidden') ? 'auto' : 0,
+                duration: 0.3,
+                ease: 'power2.inOut',
+                onComplete: () => answer.classList.toggle('hidden')
+            });
+            
+            // Rotate icon
+            gsap.to(icon, {
+                rotation: icon.style.transform.includes('180') ? 0 : 180,
+                duration: 0.3
+            });
+        });
+    });
 }
 
-function initializeProgressSteps() {
-    const steps = [
-        { title: 'Initializing', description: 'Setting up your AI receptionist' },
-        { title: 'Creating Knowledge Base', description: 'Building information database' },
-        { title: 'Training AI', description: 'Teaching your AI assistant' },
-        { title: 'Cloud Setup', description: 'Preparing cloud infrastructure' },
-        { title: 'Deployment', description: 'Launching your AI receptionist' }
+// Initialize FAQ when document is ready
+document.addEventListener('DOMContentLoaded', initializeFAQ);
+
+// Update the trial button handlers
+function initializeTrialButtons() {
+    document.querySelectorAll('.pricing-card button').forEach(button => {
+        button.addEventListener('click', () => {
+            window.location.href = '/deploy';
+        });
+    });
+}
+
+// Add this function to handle conversation set transitions
+function initializeConversationSets() {
+    const sets = [
+        {
+            // English to Spanish
+            user1: { text: "Hi, I'd like to book a room", lang: "English" },
+            bot1: { text: "I'll help you with that. What dates are you looking for?", lang: "English" },
+            user2: { text: "Prefiero continuar en español, del 15 al 20 de marzo", lang: "Spanish" },
+            bot2: { text: "Perfecto. Tenemos habitaciones disponibles para esas fechas. ¿Qué tipo de habitación prefiere?", lang: "Spanish" }
+        },
+        {
+            // French to Japanese
+            user1: { text: "Bonjour, je voudrais réserver une chambre", lang: "French" },
+            bot1: { text: "Je peux vous aider avec ça. Pour quelles dates?", lang: "French" },
+            user2: { text: "日本語で続けてもいいですか？来週の木曜日からです", lang: "Japanese" },
+            bot2: { text: "かしこまりました。何泊のご予定でしょうか？", lang: "Japanese" }
+        },
+        {
+            // German to Chinese
+            user1: { text: "Guten Tag, ich möchte ein Zimmer buchen", lang: "German" },
+            bot1: { text: "Ich helfe Ihnen gerne. Für welches Datum?", lang: "German" },
+            user2: { text: "我想用中文继续，下周二入住", lang: "Chinese" },
+            bot2: { text: "好的，请问您想预订么类型的房间？", lang: "Chinese" }
+        }
     ];
 
-    const container = document.getElementById('progressSteps');
-    if (container) {
-        container.innerHTML = steps.map((step, index) => `
-            <div class="progress-step ${index === 0 ? 'active' : ''}" data-step-index="${index}">
-                <div class="flex items-center">
-                    <div class="step-number">${index + 1}</div>
-                    <div class="step-content">
-                        <h4 class="step-title">${step.title}</h4>
-                        <p class="step-description">${step.description}</p>
-                    </div>
+    let currentSetIndex = 0;
+    const conversationContainer = document.querySelector('.conversation-sets');
+
+    function updateConversation(setIndex) {
+        const set = sets[setIndex];
+        const messages = conversationContainer.querySelectorAll('.conversation-set p');
+        const langs = conversationContainer.querySelectorAll('.text-white\\/60');
+        
+        // Update messages and languages with fade animation
+        gsap.to(messages, { opacity: 0, duration: 0.3, onComplete: () => {
+            messages[0].textContent = set.user1.text;
+            messages[1].textContent = set.bot1.text;
+            messages[2].textContent = set.user2.text;
+            messages[3].textContent = set.bot2.text;
+            
+            langs[0].textContent = `${set.user1.lang} detected`;
+            langs[1].textContent = `Speaking in ${set.user1.lang}`;
+            langs[2].textContent = `${set.user2.lang} detected`;
+            langs[3].textContent = `Speaking in ${set.user2.lang}`;
+            
+            gsap.to(messages, { opacity: 1, duration: 0.3 });
+        }});
+    }
+
+    // Change conversation set every 8 seconds
+    setInterval(() => {
+        currentSetIndex = (currentSetIndex + 1) % sets.length;
+        updateConversation(currentSetIndex);
+    }, 8000);
+}
+
+// Audio Demo Functionality
+function initializeAudioDemos() {
+    const audioFiles = {
+        'english-demo': {
+            audio: '/audio/english-demo.mp3',
+            captions: [
+                {
+                    start: 0,
+                    end: 4.5,
+                    text: "[System Initialization]",
+                    speaker: "system"
+                },
+                {
+                    start: 6.8,
+                    end: 11.02,
+                    text: "Hi, this is the AI receptionist of Hilton Edinburgh Carlton. How may I assist you today?",
+                    speaker: "ai"
+                },
+                {
+                    start: 12.04,
+                    end: 12.8,
+                    text: "Hi, how are you?",
+                    speaker: "caller"
+                },
+                {
+                    start: 16.84,
+                    end: 21.3,
+                    text: "Hello, I'm here and ready to assist you. How can I help you today? What's your name?",
+                    speaker: "ai"
+                },
+                {
+                    start: 22.32,
+                    end: 25.28,
+                    text: "My name is Rashid and do you have a deluxe room?",
+                    speaker: "caller"
+                },
+                {
+                    start: 25.28,
+                    end: 41.2,
+                    text: "Hello, Rashid. Yes, we do have deluxe rooms available at Hilton Edinburgh Carlton. Deluxe rooms offer extra space and amenities for a more comfortable stay. Would you like more information about the deluxe rooms or assistance with booking one?",
+                    speaker: "ai"
+                },
+                {
+                    start: 42.1,
+                    end: 43.78,
+                    text: "What's the cost for a night?",
+                    speaker: "caller"
+                },
+                {
+                    start: 47.36,
+                    end: 55.26,
+                    text: "The cost for a night in a deluxe room at Hilton Edinburgh Carlton is £180 for single occupancy or £200 for double occupancy.",
+                    speaker: "ai"
+                },
+                {
+                    start: 55.28,
+                    end: 58.12,
+                    text: "Would you like to proceed with booking a room?",
+                    speaker: "ai"
+                },
+                {
+                    start: 60.28,
+                    end: 60.76,
+                    text: "Yes.",
+                    speaker: "caller"
+                },
+                {
+                    start: 64.74,
+                    end: 75.52,
+                    text: "Great. I have sent you a booking link where you can complete your reservation for a deluxe room at Hilton Edinburgh Carlton. Enjoy your stay. Rashid, if you need any further assistance, feel free to ask.",
+                    speaker: "ai"
+                },
+                {
+                    start: 76.18,
+                    end: 77.06,
+                    text: "Alright, thank you. Bye.",
+                    speaker: "caller"
+                },
+                {
+                    start: 77.94,
+                    end: 79.92,
+                    text: "You're welcome. Have a wonderful day and goodbye.",
+                    speaker: "ai"
+                }
+            ]
+        },
+        'finnish-demo': {
+            audio: '/audio/finnish-demo.mp3',
+            captions: [
+                {
+                    start: 0,
+                    end: 7.22,
+                    text: "Tervetuloa! Olen tekoälyn vastaanottovirkailija Hilton Edinburgh Carltonissa. Kuinka voin auttaa sinua tänään?",
+                    speaker: "ai"
+                },
+                {
+                    start: 7.94,
+                    end: 8.58,
+                    text: "Mitä kuuluu?",
+                    speaker: "caller"
+                },
+                {
+                    start: 10.3,
+                    end: 14.12,
+                    text: "Voin hyvin kiitos kysymästä. Kuinka voin auttaa sinua tänään?",
+                    speaker: "ai"
+                },
+                {
+                    start: 15.44,
+                    end: 17.94,
+                    text: "Mikä on yhden hengen Executive-huoneen hinta?",
+                    speaker: "caller"
+                },
+                {
+                    start: 20.08,
+                    end: 27.16,
+                    text: "Yhden hengen Executive-huoneen hinta on 2020 euroa per yö. Voinko auttaa sinua jossain muussa?",
+                    speaker: "ai"
+                },
+                {
+                    start: 27.16,
+                    end: 31.1,
+                    text: "Onko se saatavilla tämän kuun seitsemäspäivänä?",
+                    speaker: "caller"
+                },
+                {
+                    start: 33.52,
+                    end: 43.24,
+                    text: "Kyllä. Yhden hengen Executive-huone on saatavilla 7. heinäkuuta 2024. Haluatko varata sen vai tarvitsetko muuta tietoa?",
+                    speaker: "ai"
+                },
+                {
+                    start: 44.56,
+                    end: 46.16,
+                    text: "Haluaisin varata huoneen...",
+                    speaker: "caller"
+                },
+                {
+                    start: 48.04,
+                    end: 51.16,
+                    text: "Mahtavaa! Autan sinua varaamisen aloittamisessa.",
+                    speaker: "ai"
+                },
+                {
+                    start: 51.96,
+                    end: 56.22,
+                    text: "Tarvitsen joitakin tietoja varmistaakseni sujuvan varauksen.",
+                    speaker: "ai"
+                },
+                {
+                    start: 56.22,
+                    end: 65.06,
+                    text: "Koko nimi, sähköposti, puhelinnumero, erityistoiveet. Ole hyvä ja anna nämä tiedot, niin hoidan loput.",
+                    speaker: "ai"
+                },
+                {
+                    start: 67.04,
+                    end: 69.26,
+                    text: "Toki annan sinulle tarvittavat tiedot.",
+                    speaker: "caller"
+                },
+                {
+                    start: 69.74,
+                    end: 75.38,
+                    text: "Koko nimi Matti Virtanen. Sähköposti mattivirtanenexample.com.",
+                    speaker: "caller"
+                },
+                {
+                    start: 75.88,
+                    end: 83.92,
+                    text: "Puhelinnumero 0122-666-X-erityistoiveet. Ei mitään. Kiitos.",
+                    speaker: "caller"
+                },
+                {
+                    start: 83.92,
+                    end: 83.96,
+                    text: "Kiitos.",
+                    speaker: "caller"
+                },
+                {
+                    start: 86.22,
+                    end: 88.92,
+                    text: "Saat pian sähköpostin, joka sisältää varauksen tiedot.",
+                    speaker: "ai"
+                },
+                {
+                    start: 88.92,
+                    end: 90.22,
+                    text: "Jos tarvitset lisäapua, älä epäröi ottaa yhteyttä.",
+                    speaker: "ai"
+                },
+                {
+                    start: 90.22,
+                    end: 99.0,
+                    text: "Odotamme innolla ja toivkemme sinut tervetulleeksi Hilton Edinburgh Carlton hotelliin.",
+                    speaker: "ai"
+                },
+                {
+                    start: 99.0,
+                    end: 107.58,
+                    text: "Voinko auttaa sinua jossain muussa?",
+                    speaker: "ai"
+                },
+                {
+                    start: 107.58,
+                    end: 108.34,
+                    text: "Eipä kiitos, näkemiin!",
+                    speaker: "caller"
+                },
+                {
+                    start: 108.34,
+                    end: 110.46,
+                    text: "Eipä kestä, Matti. Toivon sinulle mukavaa oleskelua.",
+                    speaker: "ai"
+                },
+                {
+                    start: 116.22,
+                    end: 119.46,
+                    text: "Älä epäröi ottaa yhteyttä. Näkemiin!",
+                    speaker: "ai"
+                }
+            ]
+        },
+        'arabic-demo': {
+            audio: '/audio/arabic-demo.mp3',
+            captions: [
+                {
+                    start: 0.16,
+                    end: 8.0,
+                    text: "مرحباً، أنا مساعد استقبال AI في فندقي هيلتون إدامبرت كارلتون. كيف يمكنني مساعدتك اليوم؟",
+                    speaker: "ai"
+                },
+                {
+                    start: 9.68,
+                    end: 11.0,
+                    text: "كيف حالك؟",
+                    speaker: "caller"
+                },
+                {
+                    start: 12.2,
+                    end: 16.0,
+                    text: "أنا بخير، شكراً لسؤالك. كيف يمكنني مساعدتك اليوم؟",
+                    speaker: "ai"
+                },
+                {
+                    start: 17.36,
+                    end: 19.0,
+                    text: "ما هو سعر غرفة Executive فردية؟",
+                    speaker: "caller"
+                },
+                {
+                    start: 22.4,
+                    end: 29.0,
+                    text: "سعر الغرفة التنفيذية الفردية هو 220 جنيه استرليني في الليلة.",
+                    speaker: "ai"
+                },
+                {
+                    start: 29.0,
+                    end: 33.0,
+                    text: "هل هناك أي شيء آخر يمكنني مساعدتك به؟",
+                    speaker: "ai"
+                },
+                {
+                    start: 34.04,
+                    end: 37.0,
+                    text: "هل هي متاحة في السابع من هذا الشهر؟",
+                    speaker: "caller"
+                },
+                {
+                    start: 40.24,
+                    end: 46.26,
+                    text: "نعم، الغرفة التنفيذية الفردية متاحة في السابع من يوليو 2024.",
+                    speaker: "ai"
+                },
+                {
+                    start: 47.02,
+                    end: 50.0,
+                    text: "هل تود حجزها أو تحتاج إلى معلومات أخرى؟",
+                    speaker: "ai"
+                },
+                {
+                    start: 51.36,
+                    end: 53.42,
+                    text: "أود المضي قدماً في الحجز.",
+                    speaker: "caller"
+                },
+                {
+                    start: 55.3,
+                    end: 58.98,
+                    text: "رائع، سأساعدك في بدء عملية الحجز.",
+                    speaker: "ai"
+                },
+                {
+                    start: 59.0,
+                    end: 63.0,
+                    text: "سأحتاج إلى بعض المعلومات لضمان إتمام الحجز بسلاسة.",
+                    speaker: "ai"
+                },
+                {
+                    start: 64.0,
+                    end: 70.18,
+                    text: "الاسم الكامل، البريد الإلكتروني، رقم الهاتف، أي طلبات خاصة.",
+                    speaker: "ai"
+                },
+                {
+                    start: 70.44,
+                    end: 74.32,
+                    text: "من فضلك قدم لي هذه المعلومات وسأكمل الباقي.",
+                    speaker: "ai"
+                },
+                {
+                    start: 75.58,
+                    end: 78.34,
+                    text: "بالتأكيد، اسمي أحمد محمد.",
+                    speaker: "caller"
+                },
+                {
+                    start: 78.92,
+                    end: 83.94,
+                    text: "يمكنك التواصل معي عبر البريد الإلكتروني أحمد.محمد.اتكزامبل.com",
+                    speaker: "caller"
+                },
+                {
+                    start: 83.94,
+                    end: 88.12,
+                    text: "ورقم هاتفي هو 0123456789.",
+                    speaker: "caller"
+                },
+                {
+                    start: 89.0,
+                    end: 91.42,
+                    text: "لا توجد لدي طلبات خاصة في الوقت الحالي.",
+                    speaker: "caller"
+                },
+                {
+                    start: 92.02,
+                    end: 92.68,
+                    text: "شكراً لك.",
+                    speaker: "caller"
+                },
+                {
+                    start: 94.52,
+                    end: 96.96,
+                    text: "شكراً لك على المعلومات، أحمد.",
+                    speaker: "ai"
+                },
+                {
+                    start: 97.32,
+                    end: 99.12,
+                    text: "سأقوم بإتمام حجزك الآن.",
+                    speaker: "ai"
+                },
+                {
+                    start: 99.54,
+                    end: 100.7,
+                    text: "تم تأكيد حجزك.",
+                    speaker: "ai"
+                },
+                {
+                    start: 101.1,
+                    end: 105.66,
+                    text: "ستتلقى رسالة بريد إلكتروني تحتوي على تفاصيل الحجز قريباً.",
+                    speaker: "ai"
+                },
+                {
+                    start: 106.06,
+                    end: 110.8,
+                    text: "إذا كنت بحاجة إلى أي مساعدة إضافية، فلا تتردد في التواصل.",
+                    speaker: "ai"
+                },
+                {
+                    start: 111.22,
+                    end: 114.92,
+                    text: "نتطلع للترحيب بك في فندق هيلتون إدنبرا كارلتون.",
+                    speaker: "ai"
+                },
+                {
+                    start: 114.92,
+                    end: 118.92,
+                    text: "هل هناك شيء آخر يمكنني مساعدتك به؟",
+                    speaker: "ai"
+                },
+                {
+                    start: 119.0,
+                    end: 122.1,
+                    text: "لا، شكراً.",
+                    speaker: "caller"
+                },
+                {
+                    start: 122.1,
+                    end: 122.74,
+                    text: "الله حافظ.",
+                    speaker: "caller"
+                }
+            ]
+        }
+    };
+
+    let currentAudio = null;
+    let audioContext = null;
+    let analyser = null;
+    let animationFrameId = null;
+    let visualizationActive = false;
+
+    // Optimize audio bars creation
+    function createAudioBars(container) {
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < 12; i++) { // Reduced from 20 to 12 bars
+            const bar = document.createElement('div');
+            bar.className = 'audio-bar bg-koko-600 w-1 mx-px transform transition-all duration-50';
+            bar.style.height = '20%';
+            fragment.appendChild(bar);
+        }
+        container.innerHTML = '';
+        container.appendChild(fragment);
+    }
+
+    // Optimize visualization
+    function updateVisualization() {
+        if (!analyser || !visualizationActive) return;
+
+        const audioData = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(audioData);
+
+        const bars = document.querySelectorAll('.audio-visualizer .audio-bar');
+        for (let i = 0; i < bars.length; i++) {
+            const value = audioData[i * 4] / 255; // Sample every 4th value
+            bars[i].style.height = `${value * 100}%`;
+            bars[i].style.opacity = 0.5 + value * 0.5;
+        }
+
+        if (visualizationActive) {
+            animationFrameId = requestAnimationFrame(updateVisualization);
+        }
+    }
+
+    // Clean up resources
+    function cleanupAudio() {
+        if (currentAudio) {
+            currentAudio.audio.pause();
+            currentAudio.audio.src = '';
+            currentAudio.audio.load();
+        }
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
+        visualizationActive = false;
+        currentAudio = null;
+    }
+
+    // Handle play button click with optimizations
+    document.querySelectorAll('.play-button').forEach(button => {
+        const audioId = button.dataset.audio;
+        const visualizer = button.querySelector('.audio-visualizer');
+        const playIcon = button.querySelector('.play-icon');
+        const progressBar = button.closest('.audio-card').querySelector('.audio-progress');
+        
+        createAudioBars(visualizer);
+
+        button.addEventListener('click', async () => {
+            if (currentAudio?.playing) {
+                cleanupAudio();
+                playIcon.classList.remove('hidden');
+                visualizer.classList.add('hidden');
+                progressBar.classList.add('hidden');
+                return;
+            }
+
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 32; // Reduced from 64
+                }
+
+                const audioData = audioFiles[audioId];
+                const audio = new Audio(audioData.audio);
+                const source = audioContext.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+
+                currentAudio = {
+                    id: audioId,
+                    audio,
+                    playing: true,
+                    button,
+                    progressBar
+                };
+
+                playIcon.classList.add('hidden');
+                visualizer.classList.remove('hidden');
+                progressBar.classList.remove('hidden');
+
+                audio.play();
+                visualizationActive = true;
+                updateVisualization();
+
+                // Update progress bar less frequently
+                let lastUpdate = 0;
+                audio.addEventListener('timeupdate', () => {
+                    const now = Date.now();
+                    if (now - lastUpdate > 250) { // Update every 250ms
+                        const progress = (audio.currentTime / audio.duration) * 100;
+                        progressBar.querySelector('.progress-bar').style.width = `${progress}%`;
+                        progressBar.querySelector('.current-time').textContent = formatTime(audio.currentTime);
+                        lastUpdate = now;
+                    }
+                });
+
+                audio.addEventListener('ended', () => {
+                    cleanupAudio();
+                    playIcon.classList.remove('hidden');
+                    visualizer.classList.add('hidden');
+                });
+
+                // Initialize captions if available
+                if (audioData.captions) {
+                    const demoContainer = button.closest('.audio-card');
+                    initializeCaptions(audio, audioData.captions, demoContainer);
+                }
+
+            } catch (error) {
+                console.error('Audio playback error:', error);
+                cleanupAudio();
+            }
+        });
+    });
+
+    // Clean up on page unload
+    window.addEventListener('unload', cleanupAudio);
+}
+
+// Format time for audio player
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+// Update the initializeCaptions function for smoother transitions
+function initializeCaptions(audio, captions, container) {
+    const captionsContainer = document.createElement('div');
+    captionsContainer.className = 'captions-container absolute bottom-16 left-0 right-0 p-4 overflow-hidden';
+    container.appendChild(captionsContainer);
+
+    let currentCaptionElement = null;
+    let lastCaptionIndex = -1;
+
+    function animateOutCaption(element) {
+        return new Promise(resolve => {
+            element.style.transition = 'all 0.5s ease-out';
+            element.style.transform = 'translateY(-20px)';
+            element.style.opacity = '0';
+            
+            setTimeout(() => {
+                if (element.parentNode) {
+                    element.remove();
+                }
+                resolve();
+            }, 500);
+        });
+    }
+
+    function createCaptionElement(caption) {
+        const newCaption = document.createElement('div');
+        newCaption.className = 'caption-text transform translate-y-full opacity-0 transition-all duration-500';
+        
+        const speakerClass = caption.speaker === 'ai' 
+            ? 'text-koko-600' 
+            : caption.speaker === 'caller'
+            ? 'text-blue-600'
+            : 'text-gray-500';
+        
+        const speakerIcon = caption.speaker === 'ai'
+            ? '<i class="fas fa-robot mr-2"></i>'
+            : caption.speaker === 'caller'
+            ? '<i class="fas fa-user mr-2"></i>'
+            : '<i class="fas fa-cog mr-2"></i>';
+
+        newCaption.innerHTML = `
+            <div class="bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200">
+                <div class="flex items-center ${speakerClass} text-sm mb-1">
+                    ${speakerIcon}
+                    <span>${caption.speaker === 'ai' ? 'AI Receptionist' : caption.speaker === 'caller' ? 'Caller' : 'System'}</span>
                 </div>
-                <div class="progress-bar">
-                    <div class="progress-fill"></div>
-                </div>
+                <p class="text-gray-800">${caption.text}</p>
             </div>
-        `).join('');
-    }
-}
+        `;
 
-// Utility Functions
-function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    
-    const container = document.getElementById('toastContainer');
-    container.appendChild(toast);
-    
-    setTimeout(() => toast.remove(), 3000);
-}
-
-function getRequestHeaders() {
-    const headers = {
-        'Content-Type': 'application/json'
-    };
-
-    const token = localStorage.getItem('token');
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        return newCaption;
     }
 
-    const sessionSettings = sessionStorage.getItem('sessionSettings');
-    if (sessionSettings) {
-        headers['X-Session-Settings'] = sessionSettings;
-    }
-
-    return headers;
-}
-
-// Event Listeners
-function setupEventListeners() {
-    document.getElementById('createBotForm')?.addEventListener('submit', handleFormSubmit);
-    document.querySelectorAll('input, select, textarea').forEach(element => {
-        element.addEventListener('input', updateLivePrompt);
-    });
-}
-
-// Function to start bot creation flow
-function startBotCreation() {
-    // Hide hero section
-    document.querySelector('section.bg-white.py-20').classList.add('hidden');
-    
-    // Show bot creation wizard
-    const wizard = document.getElementById('botCreationWizard');
-    wizard.classList.remove('hidden');
-    
-    // Scroll to wizard
-    wizard.scrollIntoView({ behavior: 'smooth' });
-    
-    // Initialize first step
-    showStep(1);
-}
-
-// Update the showStep function
-function showStep(stepNumber) {
-    // Update step indicators
-    const steps = document.querySelectorAll('[data-step]');
-    steps.forEach(step => {
-        const isActive = parseInt(step.dataset.step) === stepNumber;
-        step.classList.toggle('active', isActive);
-        if (isActive) {
-            step.classList.add('bg-koko-purple-600', 'text-white');
-        } else {
-            step.classList.remove('bg-koko-purple-600', 'text-white');
-        }
-    });
-
-    // Show/hide appropriate content
-    if (stepNumber === 1) {
-        // Show bot type selection
-        document.getElementById('createBotForm').classList.remove('hidden');
-        document.getElementById('pricing').classList.add('hidden');
-        document.getElementById('deploymentProgress').classList.add('hidden');
-    } else if (stepNumber === 2) {
-        // Show pricing section
-        document.getElementById('createBotForm').classList.add('hidden');
-        document.getElementById('pricing').classList.remove('hidden');
-        document.getElementById('deploymentProgress').classList.add('hidden');
-        // Initialize pricing toggle if not already done
-        initializePricing();
-    } else if (stepNumber === 3) {
-        // Show deployment progress
-        document.getElementById('createBotForm').classList.add('hidden');
-        document.getElementById('pricing').classList.add('hidden');
-        document.getElementById('deploymentProgress').classList.remove('hidden');
-        startDeployment();
-    }
-
-    state.currentStep = stepNumber;
-}
-
-// Update the pricing toggle function
-function updatePricing(e) {
-    const isYearly = e.target.checked;
-    const prices = {
-        basic: { monthly: '49.99', yearly: '479.99' },
-        professional: { monthly: '149.99', yearly: '1439.99' },
-        enterprise: { monthly: '299.99', yearly: '2879.99' }
-    };
-
-    // Update all price displays
-    document.querySelectorAll('[data-plan]').forEach(card => {
-        const plan = card.getAttribute('data-plan');
-        const priceElement = card.querySelector('.text-4xl');
-        const periodElement = card.querySelector('.text-xl');
+    async function updateCaption(caption) {
+        const newCaption = createCaptionElement(caption);
         
-        if (priceElement && periodElement) {
-            priceElement.textContent = '€' + prices[plan][isYearly ? 'yearly' : 'monthly'];
-            periodElement.textContent = isYearly ? '/year' : '/month';
+        // If there's a current caption, animate it out
+        if (currentCaptionElement) {
+            await animateOutCaption(currentCaptionElement);
+        }
+
+        // Add and animate in new caption
+        captionsContainer.appendChild(newCaption);
+        currentCaptionElement = newCaption;
+
+        // Trigger animation in next frame
+        requestAnimationFrame(() => {
+            newCaption.style.transform = 'translateY(0)';
+            newCaption.style.opacity = '1';
+        });
+    }
+
+    audio.addEventListener('timeupdate', () => {
+        const currentTime = audio.currentTime;
+        
+        // Find current caption
+        const currentCaptionIndex = captions.findIndex(
+            cap => currentTime >= cap.start && currentTime <= cap.end
+        );
+
+        // Only update if we have a new caption
+        if (currentCaptionIndex !== -1 && currentCaptionIndex !== lastCaptionIndex) {
+            lastCaptionIndex = currentCaptionIndex;
+            updateCaption(captions[currentCaptionIndex]);
         }
     });
-}
 
-// Update form submission handler
-async function handleFormSubmit(e) {
-    e.preventDefault();
-    
-    // Validate form
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData.entries());
-    
-    if (!data.botType) {
-        showToast('Please select a bot type', 'error');
-        return;
-    }
-
-    // Store form data in state
-    state.formData = data;
-    
-    // Move to pricing step
-    showStep(2);
-}
-
-// Update plan selection handler
-function selectPlan(e) {
-    const button = e.currentTarget;
-    const card = button.closest('.pricing-card');
-    
-    // Remove selection from all cards
-    document.querySelectorAll('.pricing-card').forEach(c => {
-        c.classList.remove('border-koko-purple-600', 'ring-2', 'ring-koko-purple-600');
+    // Clear captions when audio ends or pauses
+    audio.addEventListener('ended', () => {
+        if (currentCaptionElement) {
+            animateOutCaption(currentCaptionElement);
+            currentCaptionElement = null;
+        }
+        lastCaptionIndex = -1;
     });
-    
-    // Add selection to clicked card
-    card.classList.add('border-koko-purple-600', 'ring-2', 'ring-koko-purple-600');
-    
-    // Store selected plan data
-    state.selectedPlan = button.dataset.plan;
-    state.selectedAmount = parseInt(button.dataset.amount);
-    
-    // Show continue button
-    const continuePayment = document.querySelector('.continue-payment');
-    if (continuePayment) {
-        continuePayment.classList.remove('hidden');
-    }
-}
 
-// Add deployment progress update function
-function updateDeploymentProgress(status, progress) {
-    const steps = document.querySelectorAll('.progress-step');
-    const currentStep = Array.from(steps).find(step => 
-        step.querySelector('.step-title').textContent === status
-    );
-    
-    if (currentStep) {
-        // Update progress bar
-        const progressBar = currentStep.querySelector('.progress-fill');
-        if (progressBar) {
-            progressBar.style.width = `${progress}%`;
+    audio.addEventListener('pause', () => {
+        if (currentCaptionElement) {
+            animateOutCaption(currentCaptionElement);
+            currentCaptionElement = null;
         }
-        
-        // Update step status
-        currentStep.classList.add('active');
-        
-        // Mark previous steps as completed
-        let prevStep = currentStep.previousElementSibling;
-        while (prevStep) {
-            prevStep.classList.add('completed');
-            prevStep.classList.remove('active');
-            prevStep = prevStep.previousElementSibling;
+        lastCaptionIndex = -1;
+    });
+
+    // Clear captions when audio seeks
+    audio.addEventListener('seeking', () => {
+        if (currentCaptionElement) {
+            animateOutCaption(currentCaptionElement);
+            currentCaptionElement = null;
         }
-    }
+        lastCaptionIndex = -1;
+    });
 }
-
-// Add context actions management
-function showContextAction(text, action) {
-    const contextBar = document.getElementById('contextActions');
-    contextBar.innerHTML = `
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <button class="btn-primary" onclick="handleContextAction()">
-                ${text}
-                <i class="fas fa-arrow-right ml-2"></i>
-            </button>
-        </div>
-    `;
-    contextBar.classList.remove('hidden');
-    window.handleContextAction = action;
-}
-
-// Export for use in other modules if needed
-export const botCreation = {
-    state,
-    showStep,
-    startDeployment
-};

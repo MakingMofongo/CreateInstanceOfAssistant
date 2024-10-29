@@ -7,6 +7,66 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Add these styles for the new version button */
+        .new-version-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.2);
+        }
+
+        .new-version-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px -1px rgba(139, 92, 246, 0.3);
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+        }
+
+        .new-version-button i {
+            margin-right: 0.5rem;
+            font-size: 1.1em;
+        }
+
+        .version-divider {
+            margin: 1.5rem 0;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        .version-divider::before,
+        .version-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .version-divider span {
+            margin: 0 1rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        /* Add a subtle animation for the sparkle icon */
+        .fa-sparkles {
+            animation: sparkle 2s infinite;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
 </head>
 <body class="login-page">
     <div class="login-container">
@@ -14,6 +74,16 @@
             <div class="brand-section">
                 <h1 class="logo-text">KOKO<span>AI</span></h1>
                 <p class="tagline">Welcome back to your AI Assistant</p>
+            </div>
+
+            <!-- Add the new version button at the top -->
+            <button onclick="navigateToNewVersion()" class="new-version-button">
+                <i class="fas fa-sparkles"></i>
+                Try Our New Experience
+            </button>
+
+            <div class="version-divider">
+                <span>or continue with classic version</span>
             </div>
 
             <div id="mock-notice" style="display: none;" class="mock-notice">
@@ -80,6 +150,21 @@
 
     <script src="auth.js"></script>
     <script>
+        // Add this function to handle navigation to new version
+        function navigateToNewVersion() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                window.location.href = `/new?token=${token}`;
+            } else {
+                // Store the intended destination
+                sessionStorage.setItem('redirectAfterLogin', '/new');
+                // Show login form if not already visible
+                document.getElementById('loginForm').style.display = 'block';
+                // Update the tagline to indicate login requirement
+                document.querySelector('.tagline').textContent = 'Please log in to continue to the new experience';
+            }
+        }
+
         // Check for mock mode on page load
         fetch('/api/check-mock')
             .then(response => response.json())
@@ -89,7 +174,13 @@
                     document.getElementById('loginForm').style.display = 'none';
                     localStorage.setItem('token', 'mock_token');
                     setTimeout(() => {
-                        window.location.href = 'index.html';
+                        const redirectTo = sessionStorage.getItem('redirectAfterLogin');
+                        if (redirectTo === '/new') {
+                            sessionStorage.removeItem('redirectAfterLogin');
+                            window.location.href = '/new';
+                        } else {
+                            window.location.href = 'index.html';
+                        }
                     }, 2000);
                 }
             });

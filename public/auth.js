@@ -13,7 +13,14 @@ function handleAuth(endpoint) {
             if (isMock) {
                 // In mock mode, use test credentials
                 localStorage.setItem('token', 'mock_token');
-                window.location.href = 'index.html';
+                // Check for redirect after login
+                const redirectTo = sessionStorage.getItem('redirectAfterLogin');
+                if (redirectTo === '/new') {
+                    sessionStorage.removeItem('redirectAfterLogin');
+                    window.location.href = '/new';
+                } else {
+                    window.location.href = 'index.html';
+                }
                 return;
             }
 
@@ -31,7 +38,15 @@ function handleAuth(endpoint) {
 
             const { token } = await authResponse.json();
             localStorage.setItem('token', token);
-            window.location.href = 'index.html';
+            
+            // Check for redirect after login
+            const redirectTo = sessionStorage.getItem('redirectAfterLogin');
+            if (redirectTo === '/new') {
+                sessionStorage.removeItem('redirectAfterLogin');
+                window.location.href = `/new?token=${token}`;
+            } else {
+                window.location.href = 'index.html';
+            }
         } catch (error) {
             alert(error.message);
         }

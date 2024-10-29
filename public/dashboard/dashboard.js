@@ -6,7 +6,9 @@ class Dashboard {
     }
 
     async initialize() {
-        await this.checkAuth();
+        const isAuthenticated = await this.checkAuth();
+        if (!isAuthenticated) return;
+        
         await this.fetchAndDisplayBots();
         this.setupRefreshInterval();
         this.initializeEventListeners();
@@ -16,9 +18,28 @@ class Dashboard {
         const token = localStorage.getItem('token');
         if (!token && process.env.IS_MOCK !== 'true') {
             window.location.href = '/login';
-            return;
+            return false;
         }
-        await this.updateUserDisplay();
+        
+        try {
+            const response = await fetch('/api/user', {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    ...getRequestHeaders()
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to authenticate');
+            }
+            
+            await this.updateUserDisplay();
+            return true;
+        } catch (error) {
+            console.error('Authentication failed:', error);
+            window.location.href = '/login';
+            return false;
+        }
     }
 
     async updateUserDisplay() {

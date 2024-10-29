@@ -429,7 +429,7 @@ app.get('/api/bots/:id', protect, async (req, res) => {
 });
 
 // Add this near the other routes
-app.get('/new', (req, res) => {
+app.get('/new', protect, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index1.html'));
 });
 
@@ -1161,7 +1161,28 @@ app.get('/deploy', (req, res) => {
 
 // Add this route for the new version
 app.get('/new', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+    // Check if there's a token in the query parameter
+    const token = req.query.token;
+    
+    if (token) {
+        try {
+            // Verify token
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            // Send the file
+            return res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+        } catch (error) {
+            console.error('Token verification failed:', error);
+            return res.redirect('/login');
+        }
+    }
+
+    // If no token, check if it's mock mode
+    if (process.env.IS_MOCK === 'true') {
+        return res.sendFile(path.join(__dirname, 'public', 'index1.html'));
+    }
+
+    // No token and not mock mode, redirect to login
+    res.redirect('/login');
 });
 
 // Keep the original route

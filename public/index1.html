@@ -3,287 +3,1289 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KOKO AI - Enterprise AI Receptionist</title>
+    <title>KOKO NEXUS | Multilingual Voice AI Platform</title>
+    
+    <!-- Core dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Animation libraries -->
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    
+    <!-- Custom styles -->
     <link rel="stylesheet" href="styles1.css">
+    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        'koko-purple': {
-                            50: '#f5f3ff',
-                            100: '#ede9fe',
-                            500: '#8b5cf6',
-                            600: '#7c3aed',
-                            700: '#6d28d9',
+                        'koko': {
+                            50: '#f3f1ff',
+                            100: '#ebe5ff',
+                            200: '#d9ceff',
+                            300: '#bea6ff',
+                            400: '#9f75ff',
+                            500: '#843dff',
+                            600: '#7916ff',
+                            700: '#6b04fd',
+                            800: '#5a03d5',
+                            900: '#4b05ad',
+                        }
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-soft': 'pulse-soft 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        'pulse-soft': {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0.8 },
                         }
                     }
                 }
             }
         }
     </script>
-    <!-- Add this in the head section -->
-    <script src="/shared/auth.js"></script>
 </head>
-<body class="bg-gray-50">
-    <!-- Fixed Header -->
-    <header class="fixed top-0 w-full bg-white border-b border-gray-200 z-50">
+<body class="bg-white overflow-x-hidden">
+    <!-- Floating Navigation -->
+    <nav class="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-50 transition-all duration-300" id="mainNav">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
+            <div class="flex justify-between h-20 items-center">
                 <!-- Logo -->
-                <div class="flex items-center">
-                    <div class="text-2xl font-bold">
-                        <span class="text-koko-purple-600">KOKO</span>
+                <div class="flex items-center space-x-2">
+                    <div class="text-2xl font-bold tracking-tight">
+                        <span class="text-koko-600">KOKO</span>
                         <span class="text-gray-900">AI</span>
+                    </div>
+                    <span class="px-2 py-1 text-xs font-medium bg-koko-100 text-koko-800 rounded">BETA</span>
+                </div>
+
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="text-gray-600 hover:text-koko-600 transition-colors">Features</a>
+                    <a href="#how-it-works" class="text-gray-600 hover:text-koko-600 transition-colors">How It Works</a>
+                    <a href="#pricing" class="text-gray-600 hover:text-koko-600 transition-colors">Pricing</a>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="location.href='/login'" class="px-4 py-2 text-koko-600 hover:text-koko-700 transition-colors">
+                            Sign In
+                        </button>
+                        <button onclick="location.href='/deploy'" class="px-6 py-2 bg-koko-600 text-white hover:bg-koko-700 transition-colors transform hover:scale-105 flex items-center gap-2">
+                            <i class="fas fa-rocket"></i>
+                            <span>Launch Console</span>
+                        </button>
                     </div>
                 </div>
 
-                <!-- Navigation -->
-                <nav class="hidden md:flex space-x-8">
-                    <a href="#features" class="text-gray-600 hover:text-gray-900">Features</a>
-                    <a href="#pricing" class="text-gray-600 hover:text-gray-900">Pricing</a>
-                    <a href="/dashboard" class="text-gray-600 hover:text-gray-900">Dashboard</a>
-                </nav>
+                <!-- Mobile menu button -->
+                <button class="md:hidden bg-gray-50 p-2 rounded-lg" id="mobileMenuButton">
+                    <i class="fas fa-bars text-gray-600"></i>
+                </button>
+            </div>
+        </div>
 
-                <!-- Auth Buttons -->
-                <div class="flex items-center space-x-4">
-                    <div id="userSection" class="hidden">
-                        <span id="userName" class="text-gray-700"></span>
-                        <button onclick="handleLogout()" class="text-koko-purple-600 hover:text-koko-purple-700">
-                            <i class="fas fa-sign-out-alt mr-2"></i>
-                            Logout
+        <!-- Mobile Navigation -->
+        <div class="md:hidden hidden" id="mobileMenu">
+            <div class="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
+                <a href="#features" class="block px-3 py-2 text-gray-600">Features</a>
+                <a href="#how-it-works" class="block px-3 py-2 text-gray-600">How It Works</a>
+                <a href="#pricing" class="block px-3 py-2 text-gray-600">Pricing</a>
+                <div class="flex flex-col space-y-2 px-3 py-2">
+                    <button onclick="location.href='/login'" class="w-full px-4 py-2 text-koko-600 border border-koko-600">
+                        Sign In
+                    </button>
+                    <button onclick="location.href='/deploy'" class="w-full px-4 py-2 bg-koko-600 text-white">
+                        Launch Console
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <!-- Hero Content -->
+                <div class="space-y-8">
+                    <div class="inline-flex items-center space-x-2 px-3 py-1 bg-koko-50 text-koko-600 rounded-full text-sm font-medium">
+                        <span class="flex h-2 w-2 rounded-full bg-koko-500 animate-pulse"></span>
+                        <span>Introducing</span>
+                    </div>
+                    
+                    <h1 class="text-5xl md:text-7xl font-bold tracking-tight">
+                        <span class="block">KOKO</span>
+                        <span class="block text-koko-600 font-extrabold">NEXUS</span>
+                        <span class="block text-3xl md:text-4xl mt-4 text-gray-600 font-normal">Multilingual Voice AI Platform</span>
+                    </h1>
+                    
+                    <div class="flex gap-4 flex-wrap">
+                        <span class="px-3 py-1 bg-koko-50 text-koko-600 text-sm font-medium">
+                            <i class="fas fa-language mr-1"></i> Instant Language Switching
+                        </span>
+                        <span class="px-3 py-1 bg-koko-50 text-koko-600 text-sm font-medium">
+                            <i class="fas fa-bolt mr-1"></i> 2.5s Response Time
+                        </span>
+                        <span class="px-3 py-1 bg-koko-50 text-koko-600 text-sm font-medium">
+                            <i class="fas fa-globe mr-1"></i> 95+ Languages
+                        </span>
+                    </div>
+                    
+                    <p class="text-xl text-gray-600 max-w-xl">
+                        The world's first AI receptionist that switches languages instantly during live voice calls. Perfect for global businesses.
+                    </p>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button onclick="window.location.href='tel:+13394997114'" 
+                                class="flex items-center justify-center px-8 py-4 bg-koko-600 text-white hover:bg-koko-700 transform hover:scale-105 transition-all group">
+                            <i class="fas fa-phone-volume mr-2 group-hover:animate-pulse"></i>
+                            <span>Call Now - Try Live Demo</span>
+                            <span class="ml-2 text-sm opacity-75">(+1 339-499-7114)</span>
                         </button>
                     </div>
-                    <div id="authButtons" class="hidden">
-                        <button onclick="location.href='/login'" class="btn-secondary">Sign In</button>
-                        <button onclick="location.href='/signup'" class="btn-primary">Sign Up</button>
+
+                    <!-- Add language examples -->
+                    <div class="pt-8 border-t border-gray-100">
+                        <p class="text-sm text-gray-500 mb-4">Try switching between languages during your call:</p>
+                        <div class="flex flex-wrap gap-2">
+                            <div class="language-bubble animate-pulse">English → Español</div>
+                            <div class="language-bubble animate-pulse delay-100">Français → 中文</div>
+                            <div class="language-bubble animate-pulse delay-200">Deutsche → 日本語</div>
+                            <div class="language-bubble">+89 more</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hero Visual -->
+                <div class="relative">
+                    <!-- Main Visual - Live Call Demo -->
+                    <div class="relative z-10">
+                        <!-- Animated Background -->
+                        <div class="absolute inset-0 overflow-hidden">
+                            <!-- Animated Grid -->
+                            <div class="absolute inset-0" style="background-image: linear-gradient(#000000 2px, transparent 2px), linear-gradient(90deg, #000000 2px, transparent 2px); background-size: 50px 50px; opacity: 0.1; animation: gridMove 20s linear infinite;"></div>
+                            
+                            <!-- Glowing Orbs -->
+                            <div class="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/30 rounded-full filter blur-[100px] animate-pulse"></div>
+                            <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/30 rounded-full filter blur-[100px] animate-pulse delay-1000"></div>
+                            
+                            <!-- Neon Lines -->
+                            <div class="absolute inset-0 overflow-hidden">
+                                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-30 animate-scanline"></div>
+                                <div class="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-transparent via-blue-500 to-transparent opacity-30 animate-scanline-vertical"></div>
+                                <!-- Additional scan lines for continuous effect -->
+                                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-30 animate-scanline delay-1000"></div>
+                                <div class="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-transparent via-blue-500 to-transparent opacity-30 animate-scanline-vertical delay-1000"></div>
+                            </div>
+                        </div>
+
+                        <!-- Main Content with Glassmorphism -->
+                        <div class="backdrop-blur-lg bg-black/40 p-8 border border-white/10 shadow-2xl">
+                            <!-- Live Call Indicator -->
+                            <div class="absolute top-4 right-4 flex items-center space-x-2">
+                                <span class="flex h-3 w-3 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                </span>
+                                <span class="text-sm font-medium text-green-400">Live Voice Demo</span>
+                            </div>
+
+                            <!-- Active Call Visualization -->
+                            <div class="flex items-center justify-center mb-8 relative">
+                                <div class="w-20 h-20 bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-xl rounded-full flex items-center justify-center relative group">
+                                    <div class="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                                    <i class="fas fa-phone-volume text-3xl text-white group-hover:scale-110 transition-transform duration-300"></i>
+                                    
+                                    <!-- Enhanced Ripple Effect -->
+                                    <div class="absolute inset-0 rounded-full border border-white/20 animate-ripple"></div>
+                                    <div class="absolute inset-0 rounded-full border border-white/20 animate-ripple delay-500"></div>
+                                    <div class="absolute inset-0 rounded-full border border-white/20 animate-ripple delay-1000"></div>
+                                </div>
+                            </div>
+
+                            <!-- Enhanced Live Conversation Demo -->
+                            <div class="space-y-4 conversation-sets">
+                                <!-- Set 1: English to Spanish -->
+                                <div class="conversation-set" data-set="1">
+                                    <!-- User 1 English -->
+                                    <div class="flex items-start space-x-4">
+                                        <div class="w-10 h-10 bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-full flex items-center justify-center relative">
+                                            <i class="fas fa-user text-white/80"></i>
+                                            <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                                            </span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md p-4 rounded border border-white/10 relative">
+                                                <div class="absolute left-2 top-2 flex items-center space-x-2 text-xs text-white/60">
+                                                    <i class="fas fa-microphone animate-pulse"></i>
+                                                    <span>Voice Call</span>
+                                                </div>
+                                                <p class="text-white mt-4">"Hi, I'd like to book a room"</p>
+                                            </div>
+                                            <div class="mt-1 text-sm text-white/60">English detected</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bot 1 English -->
+                                    <div class="flex items-start space-x-4">
+                                        <div class="w-10 h-10 bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-full flex items-center justify-center relative">
+                                            <i class="fas fa-robot text-white/80"></i>
+                                            <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                            </span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md p-4 rounded border border-white/10 relative">
+                                                <div class="absolute left-2 top-2 flex items-center space-x-2 text-xs text-white/60">
+                                                    <i class="fas fa-volume-up"></i>
+                                                    <span>Speaking in English</span>
+                                                </div>
+                                                <p class="text-white mt-4">"I'll help you with that. What dates are you looking for?"</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- User 2 Spanish -->
+                                    <div class="flex items-start space-x-4">
+                                        <div class="w-10 h-10 bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-full flex items-center justify-center relative">
+                                            <i class="fas fa-user text-white/80"></i>
+                                            <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                                            </span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md p-4 rounded border border-white/10 relative">
+                                                <div class="absolute left-2 top-2 flex items-center space-x-2 text-xs text-white/60">
+                                                    <i class="fas fa-microphone animate-pulse"></i>
+                                                    <span>Voice Call</span>
+                                                </div>
+                                                <p class="text-white mt-4">"Prefiero continuar en español, del 15 al 20 de marzo"</p>
+                                            </div>
+                                            <div class="mt-1 text-sm text-white/60">Spanish detected</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Language Switch Indicator -->
+                                    <div class="flex justify-center my-4">
+                                        <div class="bg-gradient-to-r from-purple-500/20 to-blue-500/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+                                            <div class="flex items-center space-x-2">
+                                                <i class="fas fa-language text-blue-400 animate-pulse"></i>
+                                                <span class="text-sm font-medium text-white">Instant Language Switch</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bot 2 Spanish -->
+                                    <div class="flex items-start space-x-4">
+                                        <div class="w-10 h-10 bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-md rounded-full flex items-center justify-center relative">
+                                            <i class="fas fa-robot text-white/80"></i>
+                                            <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                            </span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md p-4 rounded border border-white/10 relative">
+                                                <div class="absolute left-2 top-2 flex items-center space-x-2 text-xs text-white/60">
+                                                    <i class="fas fa-volume-up"></i>
+                                                    <span>Hablando en Español</span>
+                                                </div>
+                                                <p class="text-white mt-4">"Perfecto. Tenemos habitaciones disponibles para esas fechas. ¿Qué tipo de habitación prefiere?"</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Set 2: French to Japanese -->
+                                <!-- Similar structure but with French/Japanese content -->
+                                <!-- Add more conversation sets following the same pattern -->
+                            </div>
+
+                            <!-- Real-time Metrics -->
+                            <div class="mt-8 grid grid-cols-3 gap-4">
+                                <div class="text-center p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md border border-white/10 rounded">
+                                    <div class="text-sm text-white/60">Response Time</div>
+                                    <div class="text-lg font-bold text-white">2.5s</div>
+                                </div>
+                                <div class="text-center p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md border border-white/10 rounded">
+                                    <div class="text-sm text-white/60">Language Switch</div>
+                                    <div class="text-lg font-bold text-white">Instant</div>
+                                </div>
+                                <div class="text-center p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md border border-white/10 rounded">
+                                    <div class="text-sm text-white/60">Languages</div>
+                                    <div class="text-lg font-bold text-white">95+</div>
+                                </div>
+                            </div>
+
+                            <!-- Call-to-Action -->
+                            <div class="mt-6 text-center p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-md border border-white/10 rounded">
+                                <p class="text-white font-medium mb-2">Experience it yourself!</p>
+                                <p class="text-sm text-white/60">Call now and switch languages mid-conversation</p>
+                                <div class="text-xl font-bold text-white mt-2 flex items-center justify-center gap-2">
+                                    <i class="fas fa-phone-volume animate-pulse"></i>
+                                    +1 339-499-7114
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Decorative Elements -->
+                    <div class="absolute top-0 right-0 w-72 h-72 bg-koko-100 rounded-full filter blur-3xl opacity-30 animate-pulse-soft"></div>
+                    <div class="absolute bottom-0 left-0 w-48 h-48 bg-blue-100 rounded-full filter blur-3xl opacity-30 animate-pulse-soft"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Add this after the Hero Section and before Features -->
+    <section class="py-20 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
+        <div class="absolute inset-0">
+            <!-- Audio Visualization Background -->
+            <div class="absolute inset-0 opacity-20">
+                <div class="audio-bars flex justify-center items-end h-full">
+                    <!-- Audio bars will be added dynamically via JS -->
+                </div>
+            </div>
+            
+            <!-- Gradient Orbs -->
+            <div class="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/30 rounded-full filter blur-[100px] animate-pulse"></div>
+            <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/30 rounded-full filter blur-[100px] animate-pulse delay-1000"></div>
+        </div>
+
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-white mb-4">Experience Live Demos</h2>
+                <p class="text-xl text-gray-400">Listen to real conversations with our AI receptionist</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- English Demo -->
+                <div class="audio-card backdrop-blur-lg bg-white/10 p-6 border border-white/20 hover:border-koko-600 transition-all duration-300 group">
+                    <div class="relative mb-6">
+                        <img 
+                            src="https://images.unsplash.com/photo-1557425493-6f90ae4659fc?ixlib=rb-4.0.3"
+                            alt="English Conversation" 
+                            class="w-full h-48 object-cover opacity-70 group-hover:opacity-100 transition-all duration-300"
+                        >
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                        <button class="play-button absolute inset-0 m-auto w-16 h-16 bg-koko-600 rounded-full flex items-center justify-center text-white transform hover:scale-110 transition-all duration-300" data-audio="english-demo">
+                            <i class="fas fa-play text-xl play-icon"></i>
+                            <div class="audio-visualizer hidden">
+                                <!-- Audio bars will be added dynamically -->
+                            </div>
+                        </button>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-2">English Conversation</h3>
+                    <p class="text-gray-400">Hotel booking with room preferences</p>
+                    <div class="audio-progress mt-4 hidden">
+                        <div class="h-1 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="progress-bar h-full w-0 bg-gradient-to-r from-koko-400 to-koko-600 transition-all duration-300"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-400 mt-1">
+                            <span class="current-time">0:00</span>
+                            <span class="total-time">0:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Finnish Demo -->
+                <div class="audio-card backdrop-blur-lg bg-white/10 p-6 border border-white/20 hover:border-koko-600 transition-all duration-300 group">
+                    <div class="relative mb-6">
+                        <img 
+                            src="https://images.unsplash.com/photo-1583793552757-5858ee2e7718?ixlib=rb-4.0.3"
+                            alt="Finnish Conversation" 
+                            class="w-full h-48 object-cover opacity-70 group-hover:opacity-100 transition-all duration-300"
+                        >
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                        <button class="play-button absolute inset-0 m-auto w-16 h-16 bg-koko-600 rounded-full flex items-center justify-center text-white transform hover:scale-110 transition-all duration-300" data-audio="finnish-demo">
+                            <i class="fas fa-play text-xl play-icon"></i>
+                            <div class="audio-visualizer hidden">
+                                <!-- Audio bars will be added dynamically -->
+                            </div>
+                        </button>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-2">Finnish Conversation</h3>
+                    <p class="text-gray-400">Hospital appointment scheduling</p>
+                    <div class="audio-progress mt-4 hidden">
+                        <div class="h-1 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="progress-bar h-full w-0 bg-gradient-to-r from-koko-400 to-koko-600 transition-all duration-300"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-400 mt-1">
+                            <span class="current-time">0:00</span>
+                            <span class="total-time">0:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Arabic Demo -->
+                <div class="audio-card backdrop-blur-lg bg-white/10 p-6 border border-white/20 hover:border-koko-600 transition-all duration-300 group">
+                    <div class="relative mb-6">
+                        <img 
+                            src="https://images.unsplash.com/photo-1565679871226-26ae08576ef3?ixlib=rb-4.0.3"
+                            alt="Arabic Conversation" 
+                            class="w-full h-48 object-cover opacity-70 group-hover:opacity-100 transition-all duration-300"
+                        >
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                        <button class="play-button absolute inset-0 m-auto w-16 h-16 bg-koko-600 rounded-full flex items-center justify-center text-white transform hover:scale-110 transition-all duration-300" data-audio="arabic-demo">
+                            <i class="fas fa-play text-xl play-icon"></i>
+                            <div class="audio-visualizer hidden">
+                                <!-- Audio bars will be added dynamically -->
+                            </div>
+                        </button>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-2">Arabic Conversation</h3>
+                    <p class="text-gray-400">Corporate meeting arrangement</p>
+                    <div class="audio-progress mt-4 hidden">
+                        <div class="h-1 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="progress-bar h-full w-0 bg-gradient-to-r from-koko-400 to-koko-600 transition-all duration-300"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-400 mt-1">
+                            <span class="current-time">0:00</span>
+                            <span class="total-time">0:00</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </header>
+    </section>
 
-    <!-- Main Content -->
-    <main class="pt-16">
-        <!-- Hero Section -->
-        <section class="bg-white py-20">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="text-center">
-                    <h1 class="text-4xl font-bold text-gray-900 sm:text-5xl md:text-6xl">
-                        <span class="block">Next Generation</span>
-                        <span class="block text-koko-purple-600">AI Receptionist</span>
-                    </h1>
-                    <p class="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-                        The only AI receptionist with real-time language switching and sub-second response times.
+    <!-- Features Section with Dramatic Lighting -->
+    <section class="relative py-32 overflow-hidden bg-gradient-to-b from-gray-900 to-black" id="features">
+        <!-- Dramatic Lighting Effects -->
+        <div class="absolute inset-0">
+            <div class="absolute top-0 left-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-50 animate-pulse"></div>
+            <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-50 animate-pulse delay-1000"></div>
+        </div>
+
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-24">
+                <h2 class="text-5xl font-bold text-white mb-6 tracking-tight">
+                    Revolutionary Language Switching
+                </h2>
+                <p class="text-xl text-gray-300">
+                    Switch languages mid-conversation with zero interruption
+                </p>
+            </div>
+
+            <!-- Main Features with Glassmorphism -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- Language Switching Feature -->
+                <div class="backdrop-blur-lg bg-white/10 p-8 border border-white/20 rounded-lg hover:transform hover:scale-105 transition-all duration-300 group">
+                    <div class="relative">
+                        <!-- Animated Icon -->
+                        <div class="absolute -top-4 -left-4 w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center transform -rotate-6 group-hover:rotate-0 transition-transform duration-300">
+                            <i class="fas fa-language text-2xl text-white"></i>
+                        </div>
+                        
+                        <div class="ml-16 pt-2">
+                            <h3 class="text-2xl font-bold text-white mb-4">
+                                Instant Language Detection & Switching
+                            </h3>
+                            <p class="text-gray-300 mb-6">
+                                Our AI detects language changes in real-time and responds instantly in the caller's preferred language.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Language Demo -->
+                    <div class="mt-8 p-6 bg-black/30 rounded-lg border border-white/10">
+                        <div class="flex items-center space-x-4 overflow-hidden">
+                            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                <i class="fas fa-microphone text-white"></i>
+                            </div>
+                            <div class="relative w-full">
+                                <div class="language-switch-demo flex flex-col space-y-2 animate-scroll text-white">
+                                    <span>English → Español</span>
+                                    <span>Français → 日本語</span>
+                                    <span>Deutsche → 中文</span>
+                                    <span>Русский → العربية</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Response Time Feature -->
+                <div class="backdrop-blur-lg bg-white/10 p-8 border border-white/20 rounded-lg hover:transform hover:scale-105 transition-all duration-300 group">
+                    <div class="relative">
+                        <div class="absolute -top-4 -left-4 w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center transform -rotate-6 group-hover:rotate-0 transition-transform duration-300">
+                            <i class="fas fa-bolt text-2xl text-white"></i>
+                        </div>
+                        
+                        <div class="ml-16 pt-2">
+                            <h3 class="text-2xl font-bold text-white mb-4">
+                                2.5s Response Time
+                            </h3>
+                            <p class="text-gray-300 mb-6">
+                                Industry-leading voice processing speed for natural conversations.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Speed Visualization -->
+                    <div class="mt-8 p-6 bg-black/30 rounded-lg border border-white/10">
+                        <div class="relative h-8 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-green-500 w-1/4 animate-pulse"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-white font-bold">2.5s</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-between text-sm text-gray-400">
+                            <span>KOKO AI: 2.5s</span>
+                            <span>Industry Average: 8-10s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technology Stack with Dramatic Effects -->
+            <div class="mt-32 relative">
+                <!-- Floating Elements -->
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-[800px] h-[800px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full animate-spin-slow"></div>
+                </div>
+
+                <div class="relative backdrop-blur-xl bg-black/50 p-12 rounded-lg border border-white/10">
+                    <h3 class="text-3xl font-bold text-white text-center mb-12">Powered by Next-Gen Technology</h3>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-12">
+                        <!-- Universal LLM Support -->
+                        <div class="flex flex-col items-center space-y-4 group">
+                            <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                                <i class="fas fa-brain text-2xl text-white"></i>
+                            </div>
+                            <span class="text-white font-medium">Universal LLM Support</span>
+                            <span class="text-gray-400 text-sm">Connect Any Model</span>
+                        </div>
+
+                        <!-- Edge Computing -->
+                        <div class="flex flex-col items-center space-y-4 group">
+                            <div class="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                                <i class="fas fa-network-wired text-2xl text-white"></i>
+                            </div>
+                            <span class="text-white font-medium">Edge Computing</span>
+                            <span class="text-gray-400 text-sm">Global Network</span>
+                        </div>
+
+                        <!-- Voice Processing -->
+                        <div class="flex flex-col items-center space-y-4 group">
+                            <div class="w-16 h-16 bg-gradient-to-r from-yellow-500 to-red-500 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                                <i class="fas fa-wave-square text-2xl text-white"></i>
+                            </div>
+                            <span class="text-white font-medium">Neural Voice</span>
+                            <span class="text-gray-400 text-sm">Advanced Processing</span>
+                        </div>
+
+                        <!-- Security -->
+                        <div class="flex flex-col items-center space-y-4 group">
+                            <div class="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                                <i class="fas fa-shield-alt text-2xl text-white"></i>
+                            </div>
+                            <span class="text-white font-medium">Enterprise Security</span>
+                            <span class="text-gray-400 text-sm">End-to-End Encryption</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Set Up in Minutes, Not Months
+                </h2>
+                <p class="text-xl text-gray-600">
+                    Our streamlined deployment process gets your AI receptionist up and running quickly
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <!-- Steps -->
+                <div class="space-y-12">
+                    <!-- Step 1 -->
+                    <div class="flex gap-8 items-start" data-aos="fade-right">
+                        <div class="flex-shrink-0 w-12 h-12 bg-koko-100 text-koko-600 flex items-center justify-center">
+                            <span class="text-xl font-bold">1</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900 mb-2">Choose Your Template</h3>
+                            <p class="text-gray-600">Select from pre-built templates for hotels, hospitals, or create a custom solution. Each template comes with industry-specific knowledge.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="flex gap-8 items-start" data-aos="fade-right" data-aos-delay="100">
+                        <div class="flex-shrink-0 w-12 h-12 bg-koko-100 text-koko-600 flex items-center justify-center">
+                            <span class="text-xl font-bold">2</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900 mb-2">Customize Your AI</h3>
+                            <p class="text-gray-600">Personalize your AI receptionist's knowledge, tone, and responses. Add your specific business information and requirements.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex gap-8 items-start" data-aos="fade-right" data-aos-delay="200">
+                        <div class="flex-shrink-0 w-12 h-12 bg-koko-100 text-koko-600 flex items-center justify-center">
+                            <span class="text-xl font-bold">3</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900 mb-2">Go Live</h3>
+                            <p class="text-gray-600">Deploy instantly to our global infrastructure. Your AI receptionist is ready to handle calls 24/7 in any language.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Demo -->
+                <div class="relative" data-aos="fade-left">
+                    <div class="bg-white border border-gray-200 p-6 shadow-xl">
+                        <div class="relative overflow-hidden rounded-lg">
+                            <!-- Modern AI Assistant Visualization -->
+                            <div class="aspect-w-16 aspect-h-9 bg-gradient-to-br from-koko-50 to-white p-8">
+                                <div class="flex flex-col items-center justify-center space-y-6">
+                                    <div class="w-16 h-16 bg-koko-100 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-phone-alt text-2xl text-koko-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-semibold text-gray-900">Experience Live AI Reception</h3>
+                                    <p class="text-gray-600 text-center max-w-md">
+                                        Call our demo line to interact with our AI receptionist in any language
+                                    </p>
+                                    <div class="text-2xl font-bold text-koko-600">+1 339-499-7114</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-center">
+                            <button onclick="window.location.href='tel:+13394997114'" class="flex items-center gap-2 px-8 py-4 bg-koko-600 text-white hover:bg-koko-700 transition-all">
+                                <i class="fas fa-phone-alt"></i>
+                                <span>Try Live Demo Now</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Performance Metrics -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Response Time -->
+                <div class="bg-white p-8 border border-gray-200" data-aos="fade-up">
+                    <div class="text-4xl font-bold text-koko-600 mb-2">2.5s</div>
+                    <div class="text-lg font-semibold text-gray-900 mb-2">Response Time</div>
+                    <p class="text-gray-600">3x faster than traditional systems</p>
+                </div>
+
+                <!-- Language Support -->
+                <div class="bg-white p-8 border border-gray-200" data-aos="fade-up" data-aos-delay="100">
+                    <div class="text-4xl font-bold text-koko-600 mb-2">95+</div>
+                    <div class="text-lg font-semibold text-gray-900 mb-2">Languages</div>
+                    <p class="text-gray-600">With real-time switching</p>
+                </div>
+
+                <!-- Uptime -->
+                <div class="bg-white p-8 border border-gray-200" data-aos="fade-up" data-aos-delay="200">
+                    <div class="text-4xl font-bold text-koko-600 mb-2">99.9%</div>
+                    <div class="text-lg font-semibold text-gray-900 mb-2">Uptime</div>
+                    <p class="text-gray-600">Enterprise-grade reliability</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Revolutionary AI Technology
+                </h2>
+                <p class="text-xl text-gray-600">
+                    Our proprietary technology sets new standards in AI communication
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Language Processing -->
+                <div class="bg-white p-8 border border-gray-200 relative overflow-hidden group">
+                    <img 
+                        src="https://images.unsplash.com/photo-1546833998-877b37c2e5c6?ixlib=rb-4.0.3"
+                        alt="AI Language Processing" 
+                        class="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity"
+                    >
+                    <div class="relative z-10">
+                        <div class="w-12 h-12 bg-koko-100 text-koko-600 flex items-center justify-center mb-6">
+                            <i class="fas fa-language text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Real-time Language Processing</h3>
+                        <ul class="space-y-3 text-gray-600">
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Instant Language Detection
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Natural Voice Synthesis
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Context Preservation
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Edge Computing -->
+                <div class="bg-white p-8 border border-gray-200 relative overflow-hidden group">
+                    <img 
+                        src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-4.0.3"
+                        alt="Edge Computing" 
+                        class="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity"
+                    >
+                    <div class="relative z-10">
+                        <div class="w-12 h-12 bg-koko-100 text-koko-600 flex items-center justify-center mb-6">
+                            <i class="fas fa-bolt text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Edge-First Architecture</h3>
+                        <ul class="space-y-3 text-gray-600">
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Global Edge Network
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                2.5s Response Time
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Zero Cold Starts
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Adaptive Learning -->
+                <div class="bg-white p-8 border border-gray-200 relative overflow-hidden group">
+                    <img 
+                        src="https://images.unsplash.com/photo-1555949963-aa79dcee981c?ixlib=rb-4.0.3"
+                        alt="AI Learning" 
+                        class="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity"
+                    >
+                    <div class="relative z-10">
+                        <div class="w-12 h-12 bg-koko-100 text-koko-600 flex items-center justify-center mb-6">
+                            <i class="fas fa-brain text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Adaptive Intelligence</h3>
+                        <ul class="space-y-3 text-gray-600">
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Continuous Learning
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Context Awareness
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check text-koko-600 mr-2"></i>
+                                Behavior Adaptation
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technology Stack Section -->
+            <div class="mt-20 text-center">
+                <h3 class="text-2xl font-bold text-gray-900 mb-8">Powered by Cutting-Edge Technology</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-12 items-center justify-items-center">
+                    <!-- LLM Integration -->
+                    <div class="flex flex-col items-center space-y-2">
+                        <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded flex items-center justify-center">
+                            <i class="fas fa-plug text-white text-2xl"></i>
+                        </div>
+                        <span class="text-sm text-gray-600">Universal LLM Support</span>
+                        <span class="text-xs text-gray-500">GPT-4, Claude, PaLM, etc.</span>
+                    </div>
+                    
+                    <!-- Edge Network -->
+                    <div class="flex flex-col items-center space-y-2">
+                        <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-teal-500 rounded flex items-center justify-center">
+                            <i class="fas fa-globe-americas text-white text-2xl"></i>
+                        </div>
+                        <span class="text-sm text-gray-600">Global Edge Network</span>
+                        <span class="text-xs text-gray-500">150+ Data Centers</span>
+                    </div>
+                    
+                    <!-- Voice AI -->
+                    <div class="flex flex-col items-center space-y-2">
+                        <div class="w-12 h-12 bg-gradient-to-r from-red-500 to-pink-500 rounded flex items-center justify-center">
+                            <i class="fas fa-waveform text-white text-2xl"></i>
+                        </div>
+                        <span class="text-sm text-gray-600">Advanced Voice AI</span>
+                        <span class="text-xs text-gray-500">Neural Voice Processing</span>
+                    </div>
+                    
+                    <!-- Container Tech -->
+                    <div class="flex flex-col items-center space-y-2">
+                        <div class="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-500 rounded flex items-center justify-center">
+                            <i class="fas fa-microchip text-white text-2xl"></i>
+                        </div>
+                        <span class="text-sm text-gray-600">Edge Computing</span>
+                        <span class="text-xs text-gray-500">Distributed Processing</span>
+                    </div>
+                </div>
+
+                <!-- Additional Tech Details -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
+                    <div class="p-6 bg-white border border-gray-200">
+                        <div class="text-koko-600 mb-4">
+                            <i class="fas fa-network-wired text-2xl"></i>
+                        </div>
+                        <h4 class="text-lg font-semibold mb-2">Flexible Integration</h4>
+                        <p class="text-gray-600">Connect with any LLM provider or use your own models</p>
+                    </div>
+
+                    <div class="p-6 bg-white border border-gray-200">
+                        <div class="text-koko-600 mb-4">
+                            <i class="fas fa-brain text-2xl"></i>
+                        </div>
+                        <h4 class="text-lg font-semibold mb-2">Neural Processing</h4>
+                        <p class="text-gray-600">State-of-the-art voice synthesis and recognition</p>
+                    </div>
+
+                    <div class="p-6 bg-white border border-gray-200">
+                        <div class="text-koko-600 mb-4">
+                            <i class="fas fa-shield-alt text-2xl"></i>
+                        </div>
+                        <h4 class="text-lg font-semibold mb-2">Enterprise Security</h4>
+                        <p class="text-gray-600">End-to-end encryption and data protection</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Simple, Transparent Pricing
+                </h2>
+                <p class="text-xl text-gray-600">
+                    Start with our free trial. No credit card required.
+                </p>
+            </div>
+
+            <!-- Pricing Toggle -->
+            <div class="flex justify-center items-center space-x-4 mb-12">
+                <span class="text-gray-600">Monthly</span>
+                <label class="relative inline-block w-20 h-10 cursor-pointer">
+                    <input type="checkbox" class="sr-only peer" id="billingToggle">
+                    <div class="w-20 h-10 bg-gray-200 peer-focus:outline-none peer-checked:after:translate-x-10 peer-checked:bg-koko-600 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:h-8 after:w-8 after:transition-all"></div>
+                </label>
+                <span class="text-gray-600">Annual <span class="text-koko-600">(Save 20%)</span></span>
+            </div>
+
+            <!-- Pricing Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                <!-- Starter Plan -->
+                <div class="bg-white border border-gray-200 p-8 relative" data-plan="starter" data-aos="fade-up">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">Starter</h3>
+                    <div class="flex items-baseline mb-8">
+                        <span class="text-4xl font-bold text-gray-900 price-amount">€49</span>
+                        <span class="text-gray-500 ml-2 price-period">/month</span>
+                        <span class="hidden annual-price">€39</span>
+                        <span class="hidden monthly-price">€49</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>1 AI Receptionist</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>5 Languages</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Basic Analytics</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Email Support</span>
+                        </li>
+                    </ul>
+                    <button onclick="location.href='/deploy'" class="w-full bg-white border-2 border-koko-600 text-koko-600 py-3 hover:bg-koko-50 transition-colors">
+                        Start Free Trial
+                    </button>
+                </div>
+
+                <!-- Professional Plan -->
+                <div class="bg-white border-2 border-koko-600 p-8 relative transform scale-105 shadow-xl" data-plan="professional" data-aos="fade-up" data-aos-delay="100">
+                    <div class="absolute top-0 right-0 bg-koko-600 text-white px-4 py-1 text-sm font-medium transform translate-y-[-50%]">
+                        MOST POPULAR
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">Professional</h3>
+                    <div class="flex items-baseline mb-8">
+                        <span class="text-4xl font-bold text-gray-900 price-amount">€149</span>
+                        <span class="text-gray-500 ml-2 price-period">/month</span>
+                        <span class="hidden annual-price">€119</span>
+                        <span class="hidden monthly-price">€149</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>3 AI Receptionists</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>All Languages</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Advanced Analytics</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Priority Support</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Custom Voice Training</span>
+                        </li>
+                    </ul>
+                    <button onclick="location.href='/deploy'" class="w-full bg-koko-600 text-white py-3 hover:bg-koko-700 transition-colors">
+                        Start Free Trial
+                    </button>
+                </div>
+
+                <!-- Enterprise Plan -->
+                <div class="bg-white border border-gray-200 p-8 relative" data-plan="enterprise" data-aos="fade-up" data-aos-delay="200">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">Enterprise</h3>
+                    <div class="flex items-baseline mb-8">
+                        <span class="text-4xl font-bold text-gray-900">Custom</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Unlimited AI Receptionists</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Custom Integration</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>Dedicated Account Manager</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>24/7 Phone Support</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-koko-600 mr-3"></i>
+                            <span>SLA Guarantee</span>
+                        </li>
+                    </ul>
+                    <button onclick="location.href='/deploy'" class="w-full bg-white border-2 border-koko-600 text-koko-600 py-3 hover:bg-koko-50 transition-colors">
+                        Contact Sales
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section with Technical Details -->
+    <section class="py-20 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
+        <!-- Decorative Elements -->
+        <div class="absolute inset-0">
+            <div class="absolute top-0 left-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-pulse"></div>
+            <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-pulse delay-1000"></div>
+        </div>
+
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-4xl font-bold text-white mb-4">
+                    Technical Specifications
+                </h2>
+                <p class="text-xl text-gray-400">
+                    Detailed insights into our technology stack and capabilities
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Architecture -->
+                <div class="space-y-4">
+                    <button class="faq-question w-full text-left p-6 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-white">System Architecture</span>
+                            <i class="fas fa-plus text-koko-600"></i>
+                        </div>
+                    </button>
+                    <div class="faq-answer hidden p-6 bg-black/30 text-gray-300">
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-microchip text-koko-600 mt-1 mr-3"></i>
+                                <span>Distributed edge computing network with 150+ global nodes</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-network-wired text-koko-600 mt-1 mr-3"></i>
+                                <span>WebRTC-based real-time voice processing with sub-100ms latency</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-database text-koko-600 mt-1 mr-3"></i>
+                                <span>Redundant data storage with 99.999% uptime guarantee</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Language Processing -->
+                <div class="space-y-4">
+                    <button class="faq-question w-full text-left p-6 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-white">Language Processing</span>
+                            <i class="fas fa-plus text-koko-600"></i>
+                        </div>
+                    </button>
+                    <div class="faq-answer hidden p-6 bg-black/30 text-gray-300">
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-brain text-koko-600 mt-1 mr-3"></i>
+                                <span>Neural language detection with 98.7% accuracy</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-language text-koko-600 mt-1 mr-3"></i>
+                                <span>Real-time translation using proprietary transformer models</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-code text-koko-600 mt-1 mr-3"></i>
+                                <span>Context preservation across language switches using state vectors</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Voice Technology -->
+                <div class="space-y-4">
+                    <button class="faq-question w-full text-left p-6 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-white">Voice Technology</span>
+                            <i class="fas fa-plus text-koko-600"></i>
+                        </div>
+                    </button>
+                    <div class="faq-answer hidden p-6 bg-black/30 text-gray-300">
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-wave-square text-koko-600 mt-1 mr-3"></i>
+                                <span>Neural voice synthesis with 44.1kHz sampling rate</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-filter text-koko-600 mt-1 mr-3"></i>
+                                <span>Advanced noise cancellation using deep learning</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-microphone text-koko-600 mt-1 mr-3"></i>
+                                <span>Adaptive gain control for optimal voice clarity</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Security -->
+                <div class="space-y-4">
+                    <button class="faq-question w-full text-left p-6 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-white">Security & Compliance</span>
+                            <i class="fas fa-plus text-koko-600"></i>
+                        </div>
+                    </button>
+                    <div class="faq-answer hidden p-6 bg-black/30 text-gray-300">
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-shield-alt text-koko-600 mt-1 mr-3"></i>
+                                <span>End-to-end encryption with 256-bit AES</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-lock text-koko-600 mt-1 mr-3"></i>
+                                <span>SOC 2 Type II and HIPAA compliant</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-user-shield text-koko-600 mt-1 mr-3"></i>
+                                <span>Zero-trust architecture with role-based access control</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Specs Grid -->
+            <div class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-white mb-4">Processing Power</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        <li class="flex items-center">
+                            <i class="fas fa-server text-koko-600 mr-2"></i>
+                            <span>32 vCPUs per instance</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-memory text-koko-600 mr-2"></i>
+                            <span>128GB RAM allocation</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-tachometer-alt text-koko-600 mr-2"></i>
+                            <span>NVMe SSD storage</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-white mb-4">Network Stats</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        <li class="flex items-center">
+                            <i class="fas fa-globe text-koko-600 mr-2"></i>
+                            <span>Global CDN coverage</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-bolt text-koko-600 mr-2"></i>
+                            <span>&lt;50ms network latency</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-shield-alt text-koko-600 mr-2"></i>
+                            <span>DDoS protection</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-white mb-4">AI Capabilities</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        <li class="flex items-center">
+                            <i class="fas fa-brain text-koko-600 mr-2"></i>
+                            <span>175B parameter model</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-microphone-alt text-koko-600 mr-2"></i>
+                            <span>Neural voice synthesis</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-language text-koko-600 mr-2"></i>
+                            <span>95+ language support</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-20 bg-koko-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl font-bold text-white mb-8">
+                Ready to Transform Your Customer Service?
+            </h2>
+            <p class="text-xl text-white/80 mb-12 max-w-2xl mx-auto">
+                Join leading businesses already using KOKO AI to provide exceptional customer service 24/7.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="location.href='/deploy'" class="px-8 py-4 bg-white text-koko-600 hover:bg-gray-100 transition-colors">
+                    Start Free Trial
+                </button>
+                <button onclick="location.href='/contact'" class="px-8 py-4 border-2 border-white text-white hover:bg-white/10 transition-colors">
+                    Contact Sales
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12">
+                <!-- Company Info -->
+                <div class="space-y-4">
+                    <div class="text-2xl font-bold">
+                        <span class="text-koko-400">KOKO</span>AI
+                    </div>
+                    <p class="text-gray-400">
+                        Next-generation AI receptionist platform for modern businesses.
                     </p>
-                    <div class="mt-8 flex justify-center space-x-4">
-                        <button onclick="location.href='/deploy'" class="btn-primary px-8 py-3">
-                            <i class="fas fa-terminal mr-2"></i>
-                            Launch Deployment Console
-                        </button>
-                        <button onclick="location.href='/dashboard'" class="btn-secondary px-8 py-3">
-                            <i class="fas fa-tachometer-alt mr-2"></i>
-                            View Dashboard
-                        </button>
-                    </div>
+                </div>
+
+                <!-- Quick Links -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Product</h3>
+                    <ul class="space-y-2">
+                        <li><a href="#features" class="text-gray-400 hover:text-white">Features</a></li>
+                        <li><a href="#pricing" class="text-gray-400 hover:text-white">Pricing</a></li>
+                        <li><a href="/deploy" class="text-gray-400 hover:text-white">Deploy</a></li>
+                    </ul>
+                </div>
+
+                <!-- Company -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Company</h3>
+                    <ul class="space-y-2">
+                        <li><a href="/about" class="text-gray-400 hover:text-white">About</a></li>
+                        <li><a href="/careers" class="text-gray-400 hover:text-white">Careers</a></li>
+                        <li><a href="/contact" class="text-gray-400 hover:text-white">Contact</a></li>
+                    </ul>
+                </div>
+
+                <!-- Legal -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Legal</h3>
+                    <ul class="space-y-2">
+                        <li><a href="/privacy" class="text-gray-400 hover:text-white">Privacy</a></li>
+                        <li><a href="/terms" class="text-gray-400 hover:text-white">Terms</a></li>
+                    </ul>
                 </div>
             </div>
-        </section>
 
-        <!-- Features Section -->
-        <section id="features" class="py-20 bg-gray-50">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <!-- Main Features -->
-                <div class="text-center mb-16">
-                    <h2 class="text-3xl font-bold text-gray-900">Why Choose KOKO AI?</h2>
-                    <p class="mt-4 text-lg text-gray-600">Industry-leading features that set us apart</p>
+            <div class="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400">© 2024 KOKO AI. All rights reserved.</p>
+                <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fab fa-twitter"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fab fa-linkedin"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fab fa-github"></i>
+                    </a>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <!-- Multilingual Feature -->
-                    <div class="bg-white p-6 border border-gray-200">
-                        <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
-                            <i class="fas fa-language text-xl text-koko-purple-600"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900">Real-time Language Switching</h3>
-                        <p class="mt-2 text-gray-600">Switch languages instantly during calls without any interruption or delay.</p>
-                        <ul class="mt-4 space-y-2 text-sm text-gray-500">
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Supports 95+ languages
-                            </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Instant language detection
-                            </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Natural accent adaptation
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Speed Feature -->
-                    <div class="bg-white p-6 border border-gray-200">
-                        <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
-                            <i class="fas fa-bolt text-xl text-koko-purple-600"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900">Sub-Second Response Time</h3>
-                        <p class="mt-2 text-gray-600">Industry-leading response times for natural conversations.</p>
-                        <ul class="mt-4 space-y-2 text-sm text-gray-500">
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                &lt;1 second response time
-                            </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Zero cold starts
-                            </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Global edge deployment
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Customization Feature -->
-                    <div class="bg-white p-6 border border-gray-200">
-                        <div class="w-12 h-12 bg-koko-purple-100 flex items-center justify-center mb-4">
-                            <i class="fas fa-wand-magic-sparkles text-xl text-koko-purple-600"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900">Deep Customization</h3>
-                        <p class="mt-2 text-gray-600">Tailor your AI receptionist to match your brand perfectly.</p>
-                        <ul class="mt-4 space-y-2 text-sm text-gray-500">
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Custom voice & tone
-                            </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Industry-specific training
-                            </li>
-                            <li class="flex items-center">
-                                <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                Flexible workflow adaptation
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Pricing Section -->
-                <section id="pricing" class="py-20 bg-white">
-                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div class="text-center mb-16">
-                            <h2 class="text-3xl font-bold text-gray-900">Simple, Transparent Pricing</h2>
-                            <p class="mt-4 text-lg text-gray-600">Choose the perfect plan for your business</p>
-                        </div>
-
-                        <!-- Pricing Toggle -->
-                        <div class="flex justify-center items-center space-x-4 mb-8">
-                            <span class="text-gray-600">Monthly</span>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="pricingToggle" class="sr-only peer">
-                                <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-koko-purple-600"></div>
-                            </label>
-                            <span class="text-gray-600">Yearly <span class="text-koko-purple-600 text-sm">(Save 20%)</span></span>
-                        </div>
-
-                        <!-- Pricing Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <!-- Basic Plan -->
-                            <div class="bg-white p-8 border border-gray-200 relative">
-                                <h3 class="text-xl font-semibold text-gray-900">Basic</h3>
-                                <div class="mt-4 flex items-baseline">
-                                    <span class="text-4xl font-bold tracking-tight text-gray-900" data-monthly="49.99" data-yearly="479.99">€49.99</span>
-                                    <span class="ml-1 text-xl font-semibold text-gray-500">/month</span>
-                                </div>
-                                <ul class="mt-6 space-y-4">
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        2 AI Receptionists
-                                    </li>
-                                    <!-- Add more features -->
-                                </ul>
-                                <button class="mt-8 w-full bg-koko-purple-600 text-white py-2 px-4 hover:bg-koko-purple-700 transition-colors duration-200" data-plan="basic" data-amount="4999">
-                                    Select Plan
-                                </button>
-                            </div>
-
-                            <!-- Pro Plan -->
-                            <div class="bg-white p-8 border-2 border-koko-purple-600 relative transform scale-105">
-                                <div class="absolute top-0 right-0 bg-koko-purple-600 text-white px-3 py-1 text-sm">
-                                    Most Popular
-                                </div>
-                                <h3 class="text-xl font-semibold text-gray-900">Professional</h3>
-                                <div class="mt-4 flex items-baseline">
-                                    <span class="text-4xl font-bold tracking-tight text-gray-900" data-monthly="149.99" data-yearly="1439.99">€149.99</span>
-                                    <span class="ml-1 text-xl font-semibold text-gray-500">/month</span>
-                                </div>
-                                <ul class="mt-6 space-y-4">
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        5 AI Receptionists
-                                    </li>
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        Priority Support
-                                    </li>
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        Custom Voice Training
-                                    </li>
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        Advanced Analytics
-                                    </li>
-                                </ul>
-                                <button class="mt-8 w-full bg-koko-purple-600 text-white py-2 px-4 hover:bg-koko-purple-700 transition-colors duration-200" data-plan="professional" data-amount="14999">
-                                    Select Plan
-                                </button>
-                            </div>
-
-                            <!-- Enterprise Plan -->
-                            <div class="bg-white p-8 border border-gray-200 relative">
-                                <h3 class="text-xl font-semibold text-gray-900">Enterprise</h3>
-                                <div class="mt-4 flex items-baseline">
-                                    <span class="text-4xl font-bold tracking-tight text-gray-900" data-monthly="299.99" data-yearly="2879.99">€299.99</span>
-                                    <span class="ml-1 text-xl font-semibold text-gray-500">/month</span>
-                                </div>
-                                <ul class="mt-6 space-y-4">
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        Unlimited AI Receptionists
-                                    </li>
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        24/7 Dedicated Support
-                                    </li>
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        Custom Integration
-                                    </li>
-                                    <li class="flex items-center">
-                                        <i class="fas fa-check text-koko-purple-600 mr-2"></i>
-                                        SLA Guarantee
-                                    </li>
-                                </ul>
-                                <button class="mt-8 w-full bg-koko-purple-600 text-white py-2 px-4 hover:bg-koko-purple-700 transition-colors duration-200" data-plan="enterprise" data-amount="29999">
-                                    Select Plan
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </div>
-        </section>
-    </main>
+        </div>
+    </footer>
 
-    <!-- Toast Container -->
-    <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
-
+    <!-- Scripts -->
     <script src="script1.js"></script>
+
+    <!-- Add a floating CTA button -->
+    <div class="fixed bottom-8 right-8 z-50">
+        <button onclick="window.location.href='tel:+13394997114'" 
+                class="flex items-center gap-2 px-6 py-3 bg-koko-600 text-white rounded-full shadow-lg hover:bg-koko-700 transition-all group">
+            <i class="fas fa-phone-volume animate-pulse"></i>
+            <span>Try Live Demo</span>
+        </button>
+    </div>
 </body>
 </html>

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOKO AI - Your AI Receptionist Creator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- External JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Add this script tag in the head section -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- Add this in the head section -->
+    <link rel="stylesheet" href="session-indicator.css">
+    <link rel="stylesheet" href="bot-dashboard.css">
+    <!-- Add this line in the <head> section, before your other scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Add this right after the <body> tag -->
+    <div class="top-bar">
+        <div class="top-bar-content">
+            <div class="user-welcome">
+                <i class="fas fa-user-circle"></i>
+                <div class="welcome-text">
+                    <span>Welcome back,</span>
+                    <span class="user-name" id="userName">Loading...</span>
+                </div>
+            </div>
+            <div class="top-bar-actions">
+                <button class="action-button admin-button" onclick="window.location.href='admin.html'">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Admin</span>
+                </button>
+                <button class="action-button" onclick="window.location.href='settings.html'">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </button>
+                <button class="action-button logout-button" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="logo">
+            <svg width="150" height="50" viewBox="0 0 150 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <text x="10" y="35" font-family="Poppins, sans-serif" font-size="32" font-weight="bold">
+                    <tspan fill="#FF3E3E">KOKO</tspan>
+                    <tspan fill="#FFFFFF">AI</tspan>
+                </text>
+            </svg>
+        </div>
+
+        <!-- Update the admin access button -->
+        <div class="admin-access">
+            <button class="admin-button">
+                <i class="fas fa-cog"></i>
+                Admin Panel
+            </button>
+        </div>
+
+        <div id="mock-mode-indicator" class="mock-mode-indicator">
+            <span class="mock-badge">MOCK MODE</span>
+            <span class="mock-description">Running in simulation mode with mock data</span>
+        </div>
+        <h1>Create Your AI Receptionist</h1>
+        <div class="notice">
+            Deploying to +13394997114. New number purchasing will be enabled when payment has been integrated.
+        </div>
+        
+        <!-- <div class="payment-system">
+            Payment System (Coming Soon)
+        </div> -->
+
+        <div class="additional-actions">
+            <div class="reveal-button-container">
+                <div class="reveal-button">
+                    <span class="dev-text">DEV</span>
+                    <svg class="arrow-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                </div>
+                <div class="hidden-content">
+                    <button id="changeHiltonUrl" class="hilton-button">
+                        Set +13394997114 to Hilton Edinburgh Assistant
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="step-indicator">
+                <div class="step active" id="step1">1</div>
+                <div class="step" id="step2">2</div>
+                <div class="step" id="step3">3</div>
+                <div class="step" id="step4">4</div>
+            </div>
+            <div class="step-content active" id="step1-content">
+                <form id="createBotForm">
+                    <div class="form-section">
+                        <h3>1. Select Assistant Type</h3>
+                        <div class="form-group">
+                            <label for="botType" class="required-field">Assistant Type</label>
+                            <select id="botType" name="botType" required>
+                                <option value="" disabled selected>Select type</option>
+                                <option value="Hotel">Hotel</option>
+                                <option value="Hospital">Hospital</option>
+                                <option value="Custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Hotel Form -->
+                    <div id="hotelForm" class="assistant-form form-section" style="display: none;">
+                        <h3>2. Hotel Information</h3>
+                        <div class="form-group">
+                            <label for="hotelName" class="required-field">Hotel Name</label>
+                            <input type="text" id="hotelName" name="hotelName" required placeholder="Enter your hotel name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hotelEmail" class="required-field">Email</label>
+                            <input type="email" id="hotelEmail" name="email" required placeholder="Enter your email address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hotelCountry" class="required-field">Country</label>
+                            <div class="country-select-container">
+                                <input type="text" id="hotelCountry" name="country" required placeholder="Search for a country">
+                                <div class="country-options" id="hotelCountryOptions"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="hotelStars">Hotel Stars</label>
+                            <select id="hotelStars" name="hotelStars">
+                                <option value="" disabled selected>Select star rating</option>
+                                <option value="1">1 Star</option>
+                                <option value="2">2 Stars</option>
+                                <option value="3">3 Stars</option>
+                                <option value="4">4 Stars</option>
+                                <option value="5">5 Stars</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="hotelRooms">Number of Rooms</label>
+                            <input type="number" id="hotelRooms" name="hotelRooms" placeholder="Enter number of rooms">
+                        </div>
+
+                        <button type="button" class="collapsible">+ Additional Hotel Information</button>
+                        <div class="collapsible-content">
+                            <div class="form-group">
+                                <label for="hotelAmenities">Amenities (comma-separated)</label>
+                                <input type="text" id="hotelAmenities" name="hotelAmenities" placeholder="e.g., Pool, Spa, Restaurant">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hotelDescription">Hotel Description</label>
+                                <textarea id="hotelDescription" name="hotelDescription" rows="3" placeholder="Describe your hotel"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hotelPolicies">Hotel Policies</label>
+                                <textarea id="hotelPolicies" name="hotelPolicies" rows="3" placeholder="Enter hotel policies"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hotelLocation">Hotel Location</label>
+                                <input type="text" id="hotelLocation" name="hotelLocation" placeholder="Enter hotel address">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hospital Form -->
+                    <div id="hospitalForm" class="assistant-form form-section" style="display: none;">
+                        <h3>2. Hospital Information</h3>
+                        <div class="form-group">
+                            <label for="hospitalName" class="required-field">Hospital Name</label>
+                            <input type="text" id="hospitalName" name="hospitalName" required placeholder="Enter your hospital name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hospitalEmail" class="required-field">Email</label>
+                            <input type="email" id="hospitalEmail" name="email" required placeholder="Enter your email address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hospitalCountry" class="required-field">Country</label>
+                            <div class="country-select-container">
+                                <input type="text" id="hospitalCountry" name="country" required placeholder="Search for a country">
+                                <div class="country-options" id="hospitalCountryOptions"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="hospitalType">Hospital Type</label>
+                            <select id="hospitalType" name="hospitalType">
+                                <option value="" disabled selected>Select hospital type</option>
+                                <option value="general">General Hospital</option>
+                                <option value="specialized">Specialized Hospital</option>
+                                <option value="teaching">Teaching Hospital</option>
+                                <option value="clinic">Clinic</option>
+                            </select>
+                        </div>
+
+                        <button type="button" class="collapsible">+ Additional Hospital Information</button>
+                        <div class="collapsible-content">
+                            <div class="form-group">
+                                <label for="hospitalDepartments">Departments (comma-separated)</label>
+                                <input type="text" id="hospitalDepartments" name="hospitalDepartments" placeholder="e.g., Emergency, Cardiology, Pediatrics">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hospitalBeds">Number of Beds</label>
+                                <input type="number" id="hospitalBeds" name="hospitalBeds" placeholder="Enter number of beds">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hospitalDescription">Hospital Description</label>
+                                <textarea id="hospitalDescription" name="hospitalDescription" rows="3" placeholder="Describe your hospital"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hospitalServices">Hospital Services</label>
+                                <textarea id="hospitalServices" name="hospitalServices" rows="3" placeholder="List main hospital services"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hospitalLocation">Hospital Location</label>
+                                <input type="text" id="hospitalLocation" name="hospitalLocation" placeholder="Enter hospital address">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Form -->
+                    <div id="customForm" class="assistant-form form-section" style="display: none;">
+                        <h3>2. Custom Assistant Information</h3>
+                        <div class="form-group">
+                            <label for="customAssistantName" class="required-field">Assistant Name</label>
+                            <input type="text" id="customAssistantName" name="assistantName" required placeholder="Enter your assistant's name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="customEmail" class="required-field">Email</label>
+                            <input type="email" id="customEmail" name="email" required placeholder="Enter your email address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="customCountry" class="required-field">Country</label>
+                            <div class="country-select-container">
+                                <input type="text" id="customCountry" name="country" required placeholder="Search for a country">
+                                <div class="country-options" id="customCountryOptions"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customIndustry">Industry</label>
+                            <input type="text" id="customIndustry" name="customIndustry" placeholder="e.g., Retail, Education, Technology">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customPurpose">Assistant's Purpose</label>
+                            <textarea id="customPurpose" name="customPurpose" rows="3" placeholder="Describe the main purpose of your AI assistant"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customTone">Preferred Tone</label>
+                            <select id="customTone" name="customTone">
+                                <option value="" disabled selected>Select preferred tone</option>
+                                <option value="professional">Professional</option>
+                                <option value="friendly">Friendly</option>
+                                <option value="casual">Casual</option>
+                                <option value="formal">Formal</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customKnowledgeBase">Knowledge Base</label>
+                            <textarea id="customKnowledgeBase" name="customKnowledgeBase" rows="3" placeholder="Enter key information for your assistant"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customGuidelines">Guidelines</label>
+                            <textarea id="customGuidelines" name="customGuidelines" rows="3" placeholder="Enter any specific guidelines for your assistant"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customPrompt">Custom Prompt (Optional)</label>
+                            <textarea id="customPrompt" name="customPrompt" rows="6" placeholder="Enter your custom prompt here. If left empty, a prompt will be generated based on the information above."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>3. Additional Information</h3>
+                        <div class="file-upload">
+                            <button class="file-upload-btn" type="button" onclick="document.getElementById('fileUpload').click()">Upload Additional Information File</button>
+                            <div class="image-upload-wrap">
+                                <input id="fileUpload" class="file-upload-input" type='file' onchange="handleFileSelect(this);" accept=".csv,.txt" />
+                                <div class="drag-text">
+                                    <h3>Drag and drop a file or click to upload</h3>
+                                </div>
+                            </div>
+                            <div class="file-upload-content" style="display: none;">
+                                <p class="uploaded-file-name"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>4. Live Prompt Preview</h3>
+                        <div id="livePrompt"></div>
+                    </div>
+
+                    <button type="submit">Create My AI Receptionist</button>
+                </form>
+            </div>
+            <div class="step-content" id="step2-content">
+                <h2>Choose Your Plan</h2>
+                <div class="pricing-toggle">
+                    <span class="toggle-label">Monthly</span>
+                    <label class="switch">
+                        <input type="checkbox" id="pricingToggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="toggle-label">Yearly</span>
+                </div>
+                <div class="pricing-cards">
+                    <div class="pricing-card">
+                        <div class="card-header">
+                            <h3>Basic</h3>
+                            <div class="price">
+                                <span class="currency">€</span>
+                                <span class="amount">49.99</span>
+                                <span class="period">/month</span>
+                            </div>
+                        </div>
+                        <ul class="features">
+                            <li><i class="fas fa-check"></i> 2 AI Receptionists</li>
+                            <li><i class="fas fa-check"></i> Support for 1 Language</li>
+                            <li><i class="fas fa-check"></i> Basic Support</li>
+                        </ul>
+                        <button class="select-plan" data-plan="basic" data-amount="4999">Select Plan</button>
+                    </div>
+                    <div class="pricing-card featured">
+                        <div class="featured-label">Most Popular</div>
+                        <div class="card-header">
+                            <h3>Professional</h3>
+                            <div class="price">
+                                <span class="currency">€</span>
+                                <span class="amount">149.99</span>
+                                <span class="period">/month</span>
+                            </div>
+                        </div>
+                        <ul class="features">
+                            <li><i class="fas fa-check"></i> 5 AI Receptionists</li>
+                            <li><i class="fas fa-check"></i> Support for 2 Languages</li>
+                            <li><i class="fas fa-check"></i> Advanced Support</li>
+                        </ul>
+                        <button class="select-plan" data-plan="professional" data-amount="14999">Select Plan</button>
+                    </div>
+                    <div class="pricing-card">
+                        <div class="card-header">
+                            <h3>Master</h3>
+                            <div class="price">
+                                <span class="currency">€</span>
+                                <span class="amount">299.99</span>
+                                <span class="period">/month</span>
+                            </div>
+                        </div>
+                        <ul class="features">
+                            <li><i class="fas fa-check"></i> 10 AI Receptionists</li>
+                            <li><i class="fas fa-check"></i> Support for 3 Languages</li>
+                            <li><i class="fas fa-check"></i> Priority Support</li>
+                        </ul>
+                        <button class="select-plan" data-plan="master" data-amount="29999">Select Plan</button>
+                    </div>
+                </div>
+                <div class="continue-payment-container" style="display: none;">
+                    <button class="continue-payment" data-amount="0">Continue to Payment</button>
+                </div>
+            </div>
+            <div class="step-content" id="step3-content">
+                <h2>Creating Your AI Receptionist</h2>
+                <div class="deployment-container">
+                    <div class="progress-container" id="progress-steps">
+                        <!-- Progress steps will be dynamically added here -->
+                    </div>
+                    <div id="completion-details"></div>
+                </div>
+                
+                <div class="notice">
+                    Deploying to +13394997114. New number purchasing will be enabled when payment has been integrated.
+                </div>
+                
+                <div class="credentials-warning">
+                    WARNING: The username and password are NOT SAVED anywhere. You MUST save them securely, or you will lose access to your assistant.
+                </div>
+            </div>
+            <div class="step-content" id="step4-content">
+                <h2>Retrieve Your AI Receptionist Information</h2>
+                <form id="retrieveDataForm">
+                    <div class="form-group">
+                        <label for="requestIdInput">Enter your Request ID:</label>
+                        <input type="text" id="requestIdInput" name="requestId" required>
+                    </div>
+                    <button type="submit">Retrieve Data</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="deployed-bots-section" class="deployed-bots-section">
+            <h2>Your Deployed Bots</h2>
+            <div id="bot-list" class="bot-list">
+                <!-- Bots will be dynamically added here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="celebration" id="celebration"></div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">
+                <span style="color: var(--primary-color);">KOKO</span>AI
+            </div>
+            <div class="footer-links">
+                <a href="#">About</a>
+                <a href="#">Contact</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            © 2024 KOKOAI. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- Persistent Prompt -->
+    <div id="persistentPrompt">
+        <div id="promptHeader">
+            <h4>Live Prompt Preview</h4>
+            <button id="togglePrompt">▲</button>
+        </div>
+        <div id="persistentPromptContent"></div>
+    </div>
+
+    <!-- Remove or comment out the account modal -->
+    <!-- <div id="account-modal" class="modal">
+        <div class="modal-content">
+            <h2>Account Information</h2>
+            <p><strong>Name:</strong> <span id="modal-user-name"></span></p>
+            <p><strong>Email:</strong> <span id="modal-user-email"></span></p>
+            <button id="close-modal">Close</button>
+        </div>
+    </div> -->
+
+    <!-- Bot Details Modal -->
+    <div id="bot-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Bot Details</h2>
+            <div id="bot-details"></div>
+        </div>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="script.js"></script>
+    <!-- Add this script at the end of the body -->
+    <!-- Remove the script that checks for token -->
+    <!-- <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'login.html';
+            }
+        });
+    </script> -->
+    <!-- Remove the user-bar.js script if it's no longer needed -->
+    <!-- <script src="user-bar.js"></script> -->
+    <script src="deployed-bots.js"></script>
+    <!-- Add this script right before the closing </body> tag -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (!token && process.env.IS_MOCK !== 'true') {
+                window.location.href = 'login.html';
+            }
+        });
+    </script>
+    <!-- Add this before the closing </body> tag in both index.html and admin.html -->
+    <script src="session-indicator.js"></script>
+</body>
+</html>
