@@ -8,9 +8,11 @@ const sourceFiles = [
     'receptionist.js',
     '.env',
     'transcription-service.js',
-    '.dockerfile',
+    'DockerFile',
     'package.json',
-    'google_creds.json'
+    'package-lock.json',
+    'google_creds.json',
+    'cloudbuild.yaml'
 ];
 
 function generateCredentials() {
@@ -43,9 +45,23 @@ function clone(assistant_id, serviceUrl) {
     }
 
     sourceFiles.forEach((file) => {
-        const sourceFilePath = path.join(__dirname, 'Source', file);
-        const destinationFilePath = path.join(__dirname, newFolderName, file);
-        fs.copyFileSync(sourceFilePath, destinationFilePath);
+        try {
+            const sourceFilePath = path.join(__dirname, 'Source', file);
+            const destinationFilePath = path.join(__dirname, newFolderName, file);
+            
+            if (fs.existsSync(sourceFilePath)) {
+                fs.copyFileSync(sourceFilePath, destinationFilePath);
+                // For .env file, set proper permissions
+                if (file === '.env') {
+                    fs.chmodSync(destinationFilePath, 0o600);
+                }
+                console.log(`Successfully copied ${file}`);
+            } else {
+                console.warn(`Warning: Source file ${file} not found`);
+            }
+        } catch (error) {
+            console.error(`Error copying ${file}:`, error);
+        }
     });
 
     const publicSourcePath = path.join(__dirname, 'Source', 'public');

@@ -1,7 +1,40 @@
 // LLM.js
 const { log } = require('console');
 const OpenAI = require('openai');
-const openai = new OpenAI();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+// Add check for required environment variables
+const requiredEnvVars = [
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'OPENAI_API_KEY',
+  'ELEVENLABS_API_KEY',
+  'OPENAI_ASSISTANT_ID',
+  'PORT',
+  'DEV_CONSOLE_USERNAME',
+  'DEV_CONSOLE_PASSWORD',
+  'LANGUAGES'
+];
+
+// Log all environment variables
+console.log('Environment Variables:');
+console.log('GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+console.log('ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY); 
+console.log('OPENAI_ASSISTANT_ID:', process.env.OPENAI_ASSISTANT_ID);
+console.log('PORT:', process.env.PORT);
+console.log('DEV_CONSOLE_USERNAME:', process.env.DEV_CONSOLE_USERNAME);
+console.log('DEV_CONSOLE_PASSWORD:', process.env.DEV_CONSOLE_PASSWORD);
+console.log('LANGUAGES:', process.env.LANGUAGES);
+
+console.log('Current working directory:', process.cwd());
+console.log('__dirname:', __dirname);
+console.log('.env file path:', path.resolve(__dirname, '.env'));
+
+console.log(process.env.OPENAI_API_KEY);
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
 
 let assistant = null;
 const initialMessage = "Hi! this is the AI receptionist of Hilton Edinburgh Carlton, how may I assist you today?";

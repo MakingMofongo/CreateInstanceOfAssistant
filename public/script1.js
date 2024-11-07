@@ -352,89 +352,83 @@ function initializeConversationSets() {
 // Audio Demo Functionality
 function initializeAudioDemos() {
     const audioFiles = {
-        'english-demo': {
-            audio: '/audio/english-demo.mp3',
-            captions: [
-                {
-                    start: 0,
-                    end: 4.5,
-                    text: "[System Initialization]",
-                    speaker: "system"
-                },
-                {
-                    start: 6.8,
-                    end: 11.02,
-                    text: "Hi, this is the AI receptionist of Hilton Edinburgh Carlton. How may I assist you today?",
-                    speaker: "ai"
-                },
-                {
-                    start: 12.04,
-                    end: 12.8,
-                    text: "Hi, how are you?",
-                    speaker: "caller"
-                },
-                {
-                    start: 16.84,
-                    end: 21.3,
-                    text: "Hello, I'm here and ready to assist you. How can I help you today? What's your name?",
-                    speaker: "ai"
-                },
-                {
-                    start: 22.32,
-                    end: 25.28,
-                    text: "My name is Rashid and do you have a deluxe room?",
-                    speaker: "caller"
-                },
-                {
-                    start: 25.28,
-                    end: 41.2,
-                    text: "Hello, Rashid. Yes, we do have deluxe rooms available at Hilton Edinburgh Carlton. Deluxe rooms offer extra space and amenities for a more comfortable stay. Would you like more information about the deluxe rooms or assistance with booking one?",
-                    speaker: "ai"
-                },
-                {
-                    start: 42.1,
-                    end: 43.78,
-                    text: "What's the cost for a night?",
-                    speaker: "caller"
-                },
-                {
-                    start: 47.36,
-                    end: 55.26,
-                    text: "The cost for a night in a deluxe room at Hilton Edinburgh Carlton is £180 for single occupancy or £200 for double occupancy.",
-                    speaker: "ai"
-                },
-                {
-                    start: 55.28,
-                    end: 58.12,
-                    text: "Would you like to proceed with booking a room?",
-                    speaker: "ai"
-                },
-                {
-                    start: 60.28,
-                    end: 60.76,
-                    text: "Yes.",
-                    speaker: "caller"
-                },
-                {
-                    start: 64.74,
-                    end: 75.52,
-                    text: "Great. I have sent you a booking link where you can complete your reservation for a deluxe room at Hilton Edinburgh Carlton. Enjoy your stay. Rashid, if you need any further assistance, feel free to ask.",
-                    speaker: "ai"
-                },
-                {
-                    start: 76.18,
-                    end: 77.06,
-                    text: "Alright, thank you. Bye.",
-                    speaker: "caller"
-                },
-                {
-                    start: 77.94,
-                    end: 79.92,
-                    text: "You're welcome. Have a wonderful day and goodbye.",
-                    speaker: "ai"
-                }
-            ]
+'english-demo': {
+    audio: '/audio/english-demo-trimmed.mp3',
+    captions: [
+        {
+            start: 0,
+            end: 4.22,
+            text: "Hi, this is the AI receptionist of Hilton Edinburgh Carlton. How may I assist you today?",
+            speaker: "ai"
         },
+        {
+            start: 5.24,
+            end: 6.0,
+            text: "Hi, how are you?",
+            speaker: "caller"
+        },
+        {
+            start: 10.04,
+            end: 14.5,
+            text: "Hello, I'm here and ready to assist you. How can I help you today? What's your name?",
+            speaker: "ai"
+        },
+        {
+            start: 15.52,
+            end: 18.48,
+            text: "My name is Rashid and do you have a deluxe room?",
+            speaker: "caller"
+        },
+        {
+            start: 18.48,
+            end: 34.4,
+            text: "Hello, Rashid. Yes, we do have deluxe rooms available at Hilton Edinburgh Carlton. Deluxe rooms offer extra space and amenities for a more comfortable stay. Would you like more information about the deluxe rooms or assistance with booking one?",
+            speaker: "ai"
+        },
+        {
+            start: 35.3,
+            end: 36.98,
+            text: "What's the cost for a night?",
+            speaker: "caller"
+        },
+        {
+            start: 40.56,
+            end: 48.46,
+            text: "The cost for a night in a deluxe room at Hilton Edinburgh Carlton is £180 for single occupancy or £200 for double occupancy.",
+            speaker: "ai"
+        },
+        {
+            start: 48.48,
+            end: 51.32,
+            text: "Would you like to proceed with booking a room?",
+            speaker: "ai"
+        },
+        {
+            start: 53.48,
+            end: 53.96,
+            text: "Yes.",
+            speaker: "caller"
+        },
+        {
+            start: 57.94,
+            end: 68.72,
+            text: "Great. I have sent you a booking link where you can complete your reservation for a deluxe room at Hilton Edinburgh Carlton. Enjoy your stay. Rashid, if you need any further assistance, feel free to ask.",
+            speaker: "ai"
+        },
+        {
+            start: 69.38,
+            end: 70.26,
+            text: "Alright, thank you. Bye.",
+            speaker: "caller"
+        },
+        {
+            start: 71.14,
+            end: 73.12,
+            text: "You're welcome. Have a wonderful day and goodbye.",
+            speaker: "ai"
+        }
+    ]
+},
         'finnish-demo': {
             audio: '/audio/finnish-demo.mp3',
             captions: [

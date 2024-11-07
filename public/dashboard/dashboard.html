@@ -131,13 +131,15 @@
     <!-- Toast Container -->
     <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
 
+    <script src="/dashboard/dashboard.js"></script>
     <script>
+        // Add this to handle environment variables in the browser
+        const ENV = {
+            IS_MOCK: true,  // Set this based on your needs
+            DISABLE_AUTH: true  // Add this to bypass authentication in mock mode
+        };
+        
         document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('token');
-            if (!token && process.env.IS_MOCK !== 'true') {
-                window.location.href = '/login';
-                return;
-            }
             const dashboard = new Dashboard();
             await dashboard.initialize();
         });

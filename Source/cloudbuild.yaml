@@ -1,0 +1,47 @@
+steps:
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - '--destination=asia-south1-docker.pkg.dev/${PROJECT_ID}/docker-repo/${_SERVICE_NAME}'
+      - '--cache=true'
+      - '--cache-ttl=24h'
+      - '--context=.'
+      - '--dockerfile=./DockerFile'
+      - '--build-arg=PORT=8080'
+      - '--snapshot-mode=redo'
+      - '--use-new-run'
+      - '--compressed-caching=false'
+      - '--skip-unused-stages'
+      - '--verbosity=info'
+      - '--log-format=text'
+      - '--log-timestamp'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-service'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Starting Cloud Run deployment..."
+        echo "Deploying service: ${_SERVICE_NAME}"
+        echo "Region: asia-south1"
+        echo "Project: ${PROJECT_ID}"
+        
+        gcloud run deploy ${_SERVICE_NAME} \
+          --image=asia-south1-docker.pkg.dev/${PROJECT_ID}/docker-repo/${_SERVICE_NAME} \
+          --region=asia-south1 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --project=${PROJECT_ID} \
+          --format=json \
+          --verbosity=info
+
+        echo "Deployment completed successfully"
+
+substitutions:
+  _SERVICE_NAME: default-service-name
+
+timeout: '1800s'
+options:
+  machineType: 'E2_HIGHCPU_8'
+  env:
+    - 'CLOUDSDK_CORE_VERBOSITY=info'

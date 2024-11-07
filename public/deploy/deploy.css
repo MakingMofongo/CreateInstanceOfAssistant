@@ -48,3 +48,190 @@
     @apply bg-gray-50 p-4 rounded;
     @apply font-mono text-sm;
 }
+
+.progress-bar {
+    transition: width 0.5s ease-in-out;
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Add styles for the step description */
+.progress-step p {
+    transition: all 0.3s ease-in-out;
+}
+
+.progress-step.active p {
+    color: #6d28d9; /* koko-purple-700 */
+    font-weight: 500;
+}
+
+/* Add connection status indicator styles */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0.5rem;
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Make sure the hidden class doesn't override display flex */
+.connection-status.hidden {
+    display: none;
+}
+
+.connection-status.connection-active {
+    display: flex;
+    background-color: #f5f3ff; /* Light purple background */
+    border-color: #ddd6fe;
+}
+
+.connection-pulse {
+    position: relative;
+    width: 12px; /* Increased size */
+    height: 12px;
+    border-radius: 50%;
+    background-color: #7c3aed;
+}
+
+.connection-pulse::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border-radius: 50%;
+    border: 2px solid #7c3aed;
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping {
+    75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+.connection-message {
+    font-size: 0.875rem;
+    color: #6d28d9;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.connection-time {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-family: monospace;
+}
+
+/* Enhanced loading dots animation */
+.loading-dots {
+    display: inline-block;
+    min-width: 1.5em;
+}
+
+.loading-dots::after {
+    content: '';
+    animation: loading-dots 2s infinite steps(4);
+}
+
+@keyframes loading-dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+    100% { content: ''; }
+}
+
+/* Add a container for the progress steps */
+.progress-container {
+    position: relative;
+    padding: 1rem;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Style for active step with pulsing border */
+.progress-step.active {
+    position: relative;
+}
+
+.progress-step.active::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 2px solid #7c3aed;
+    border-radius: 0.5rem;
+    animation: border-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes border-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Add connection status states */
+.connection-status.connection-warning {
+    background-color: #fff7ed;
+    border-color: #fed7aa;
+}
+
+.connection-status.connection-error {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+}
+
+.connection-warning .connection-pulse {
+    background-color: #f97316;
+}
+
+.connection-warning .connection-pulse::after {
+    border-color: #f97316;
+}
+
+.connection-error .connection-pulse {
+    background-color: #ef4444;
+}
+
+.connection-error .connection-pulse::after {
+    border-color: #ef4444;
+}
+
+.connection-warning .connection-message {
+    color: #c2410c;
+}
+
+.connection-error .connection-message {
+    color: #b91c1c;
+}
+
+/* Remove pulsing from completed steps */
+.progress-step.completed::before {
+    display: none;
+}

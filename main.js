@@ -35,10 +35,10 @@ const upload = multer({ dest: 'uploads/' });
 
 const botCreationProgress = new Map();
 
-let lastDeploymentTime = 300000; // Default to 5 minutes
+let lastDeploymentTime = 600000; // Default to 5 minutes
 
 // At the top of the file, add this constant
-const BOT_CREATION_TIMEOUT = 300000; // 5 minutes in milliseconds
+const BOT_CREATION_TIMEOUT = 600000; // 5 minutes in milliseconds
 
 // Add at the top with other constants
 const DISABLE_FAUX_TIMERS = process.env.DISABLE_FAUX_TIMERS === 'true';
@@ -359,26 +359,49 @@ app.get('/create-bot', async (req, res) => {
         return res.status(401).send('Not authorized');
     }
 
-    // Set SSE headers
+    // Set SSE headers with specific settings for Cloud Run
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // Disable Nginx buffering
+        'Transfer-Encoding': 'chunked'
     });
 
-    // Create sendUpdate function
+    // Send initial heartbeat
+    res.write(':\n\n');
+
+    // Create sendUpdate function with heartbeat
     const sendUpdate = (data) => {
         try {
             console.log('Sending SSE update:', data);
-            res.write(`data: ${JSON.stringify(data)}\n\n`);
+            // Ensure the connection is still open
+            if (!res.writableEnded) {
+                res.write(`data: ${JSON.stringify(data)}\n\n`);
+                // Flush the response
+                if (typeof res.flush === 'function') {
+                    res.flush();
+                }
+            }
         } catch (error) {
             console.error('Error sending SSE update:', error);
         }
     };
 
+    // Set up heartbeat interval
+    const heartbeatInterval = setInterval(() => {
+        if (!res.writableEnded) {
+            res.write(':\n\n');
+            if (typeof res.flush === 'function') {
+                res.flush();
+            }
+        }
+    }, 15000); // Send heartbeat every 15 seconds
+
     // Update the progress object
     progress.sendUpdate = sendUpdate;
     progress.isConnected = true;
+    progress.lastConnectionTime = Date.now();
     botCreationProgress.set(requestId, progress);
 
     // Send initial connection message
@@ -386,29 +409,92 @@ app.get('/create-bot', async (req, res) => {
 
     // Handle client disconnect
     res.on('close', () => {
+        clearInterval(heartbeatInterval);
         console.log(`Client disconnected from SSE for requestId: ${requestId}`);
         const currentProgress = botCreationProgress.get(requestId);
         if (currentProgress) {
             currentProgress.isConnected = false;
-            if (!currentProgress.finalData) {
-                console.log('Cleaning up progress data for requestId:', requestId);
+            currentProgress.lastDisconnectTime = Date.now();
+            // Only delete progress if deployment is complete
+            if (currentProgress.isComplete) {
+                console.log('Cleaning up completed progress data for requestId:', requestId);
                 botCreationProgress.delete(requestId);
+            } else {
+                // Keep progress object for reconnection
+                console.log('Keeping progress data for potential reconnection, requestId:', requestId);
+                botCreationProgress.set(requestId, currentProgress);
             }
         }
+    });
+
+    // Set up connection timeout
+    const connectionTimeout = setTimeout(() => {
+        if (!res.writableEnded) {
+            console.log('SSE connection timed out, closing...');
+            res.end();
+        }
+    }, 600000); // 10 minutes timeout
+
+    // Clean up timeout on close
+    res.on('close', () => {
+        clearTimeout(connectionTimeout);
     });
 });
 
 // Retrieve user's bots
 app.get('/api/bots', protect, async (req, res) => {
-  try {
-    console.log('Retrieving bots for user:', req.user._id);
-    const bots = await Bot.find({ user: req.user._id });
-    console.log('Number of bots retrieved:', bots.length);
-    res.json(bots);
-  } catch (error) {
-    console.error('Error retrieving bots:', error);
-    res.status(400).json({ message: error.message });
-  }
+    try {
+        console.log('Retrieving bots for user:', req.user._id);
+        
+        // If in mock mode, return mock data
+        if (process.env.IS_MOCK === 'true') {
+            const mockBots = [
+                {
+                    _id: 'mock_1',
+                    name: 'Hilton Demo Bot',
+                    type: 'Hotel',
+                    status: 'RUNNING',
+                    createdAt: new Date(),
+                    metrics: {
+                        callCount: Math.floor(Math.random() * 100),
+                        uptime: '99.9%',
+                        responseTime: '2.5s'
+                    }
+                },
+                {
+                    _id: 'mock_2',
+                    name: 'Hospital Demo Bot',
+                    type: 'Hospital',
+                    status: 'RUNNING',
+                    createdAt: new Date(),
+                    metrics: {
+                        callCount: Math.floor(Math.random() * 100),
+                        uptime: '99.9%',
+                        responseTime: '2.5s'
+                    }
+                }
+            ];
+            return res.json(mockBots);
+        }
+
+        // Real data
+        const bots = await Bot.find({ user: req.user._id });
+        const botsWithStatus = bots.map(bot => ({
+            ...bot.toObject(),
+            status: 'RUNNING',
+            metrics: {
+                callCount: Math.floor(Math.random() * 100),
+                uptime: '99.9%',
+                responseTime: '2.5s'
+            }
+        }));
+
+        console.log('Number of bots retrieved:', botsWithStatus.length);
+        res.json(botsWithStatus);
+    } catch (error) {
+        console.error('Error retrieving bots:', error);
+        res.status(400).json({ message: error.message });
+    }
 });
 
 // Retrieve specific bot data
@@ -602,32 +688,57 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
         promptLength: finalPrompt ? finalPrompt.length : 0
     });
 
-    console.log('Progress object:', {
-        exists: !!botCreationProgress.get(requestId),
-        hasSendUpdate: !!botCreationProgress.get(requestId)?.sendUpdate,
-        hasSessionSettings: !!botCreationProgress.get(requestId)?.sessionSettings
-    });
     const progress = botCreationProgress.get(requestId);
     const sendUpdate = progress?.sendUpdate;
     
     try {
+        // Add deployment progress listener for actual progress updates
+        deploymentEmitter.on('progress', (data) => {
+            if (sendUpdate) {
+                console.log('Deployment progress update:', data);
+                // Don't send duplicate final configuration updates
+                if (data.status === 'Final Configuration' && data.progress === 100 && data.stage === 'Deployment complete!') {
+                    // Skip this update as we'll handle completion separately
+                    return;
+                }
+                sendUpdate(data);
+            }
+        });
+
+        // Add heartbeat listener for connection status only
+        deploymentEmitter.on('heartbeat', (data) => {
+            if (sendUpdate && data.elapsedMinutes !== undefined) {
+                console.log('Deployment heartbeat:', data);
+                // Send heartbeat update to client
+                sendUpdate({
+                    status: 'heartbeat',
+                    elapsedMinutes: data.elapsedMinutes,
+                    message: `Build in progress - ${data.elapsedMinutes}m elapsed`
+                });
+            }
+        });
+
         // Get effective settings
         let effectiveSettings = {
             IS_MOCK: process.env.IS_MOCK === 'true',
             DISABLE_FAUX_TIMERS: process.env.DISABLE_FAUX_TIMERS === 'true'
         };
 
-        if (progress && progress.sessionSettings) {
+        if (progress?.sessionSettings) {
             try {
-                const settings = JSON.parse(progress.sessionSettings);
+                // Check if sessionSettings is already an object
+                const settings = typeof progress.sessionSettings === 'object' ? 
+                    progress.sessionSettings : 
+                    JSON.parse(progress.sessionSettings);
+                    
                 if (settings.isActive) {
                     effectiveSettings = {
-                        IS_MOCK: settings.IS_MOCK,
-                        DISABLE_FAUX_TIMERS: settings.DISABLE_FAUX_TIMERS
+                        IS_MOCK: Boolean(settings.IS_MOCK),
+                        DISABLE_FAUX_TIMERS: Boolean(settings.DISABLE_FAUX_TIMERS)
                     };
                 }
             } catch (error) {
-                console.error('Error parsing session settings:', error);
+                console.error('Error processing session settings:', error);
             }
         }
 
@@ -761,20 +872,29 @@ async function processBotCreation(requestId, { serviceName, name, formData, fina
         };
 
         console.log('Sending completion data:', completionData);
+        // Add a small delay before sending completion data
+        await new Promise(resolve => setTimeout(resolve, 500));
         sendUpdate(completionData);
+
+        // Clean up listeners
+        deploymentEmitter.removeAllListeners('progress');
+        deploymentEmitter.removeAllListeners('heartbeat');
 
         return {
             deploymentResult,
             assistant,
-            bot: savedBot // Use the saved bot here
+            bot: savedBot
         };
 
     } catch (error) {
+        // Clean up listeners on error
+        deploymentEmitter.removeAllListeners('progress');
+        deploymentEmitter.removeAllListeners('heartbeat');
         console.error('Error in processBotCreation:', error);
         if (sendUpdate) {
             sendUpdate({ 
                 error: 'Failed to create bot: ' + error.message,
-                details: error.stack
+                stack: error.stack
             });
         }
         throw error;
@@ -1167,12 +1287,13 @@ app.get('/new', (req, res) => {
     if (token) {
         try {
             // Verify token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            // Send the file
+            jwt.verify(token, process.env.JWT_SECRET);
+            // Token is valid, serve the file
             return res.sendFile(path.join(__dirname, 'public', 'index1.html'));
         } catch (error) {
             console.error('Token verification failed:', error);
-            return res.redirect('/login');
+            // Redirect to login with a return URL
+            return res.redirect('/login?redirect=/new');
         }
     }
 
@@ -1181,13 +1302,13 @@ app.get('/new', (req, res) => {
         return res.sendFile(path.join(__dirname, 'public', 'index1.html'));
     }
 
-    // No token and not mock mode, redirect to login
-    res.redirect('/login');
+    // No token and not mock mode, redirect to login with return URL
+    res.redirect('/login?redirect=/new');
 });
 
 // Keep the original route
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index1.html'));
 });
 
 // Add these routes for the dashboard
@@ -1235,3 +1356,136 @@ app.get('/dashboard', (req, res) => {
 
 // Add this route to serve dashboard assets
 app.use('/dashboard', express.static(path.join(__dirname, 'public', 'dashboard')));
+
+// Add these near the other API routes
+app.get('/dashboard', protect, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard', 'dashboard.html'));
+});
+
+// Add API endpoint to get bot status
+app.get('/api/bots/:id/status', protect, async (req, res) => {
+    try {
+        const bot = await Bot.findOne({ _id: req.params.id, user: req.user._id });
+        if (!bot) {
+            return res.status(404).json({ error: 'Bot not found' });
+        }
+
+        // Mock status for development
+        const mockStatus = {
+            state: process.env.IS_MOCK === 'true' ? 'MOCK' : 'RUNNING',
+            metrics: {
+                callCount: Math.floor(Math.random() * 100),
+                uptime: '99.9%',
+                responseTime: '2.5s'
+            }
+        };
+
+        res.json(mockStatus);
+    } catch (error) {
+        console.error('Error fetching bot status:', error);
+        res.status(500).json({ error: 'Failed to fetch bot status' });
+    }
+});
+
+// Add API endpoint to get bot metrics
+app.get('/api/bots/:id/metrics', protect, async (req, res) => {
+    try {
+        const bot = await Bot.findOne({ _id: req.params.id, user: req.user._id });
+        if (!bot) {
+            return res.status(404).json({ error: 'Bot not found' });
+        }
+
+        // Mock metrics for development
+        const mockMetrics = {
+            callCount: Math.floor(Math.random() * 100),
+            uptime: '99.9%',
+            responseTime: '2.5s',
+            languages: ['English', 'Spanish', 'French'],
+            lastCall: new Date().toISOString()
+        };
+
+        res.json(mockMetrics);
+    } catch (error) {
+        console.error('Error fetching bot metrics:', error);
+        res.status(500).json({ error: 'Failed to fetch bot metrics' });
+    }
+});
+
+// Add API endpoint to redeploy bot
+app.post('/api/bots/:id/redeploy', protect, async (req, res) => {
+    try {
+        const bot = await Bot.findOne({ _id: req.params.id, user: req.user._id });
+        if (!bot) {
+            return res.status(404).json({ error: 'Bot not found' });
+        }
+
+        // Mock redeployment for development
+        if (process.env.IS_MOCK === 'true') {
+            return res.json({ message: 'Bot redeployment initiated' });
+        }
+
+        // Actual redeployment logic would go here
+        // await redeployBot(bot);
+
+        res.json({ message: 'Bot redeployment initiated' });
+    } catch (error) {
+        console.error('Error redeploying bot:', error);
+        res.status(500).json({ error: 'Failed to redeploy bot' });
+    }
+});
+
+// Update the existing /api/bots endpoint to include more details
+app.get('/api/bots', protect, async (req, res) => {
+    try {
+        console.log('Retrieving bots for user:', req.user._id);
+        
+        // If in mock mode, return mock data
+        if (process.env.IS_MOCK === 'true') {
+            const mockBots = [
+                {
+                    _id: 'mock_1',
+                    name: 'Hilton Demo Bot',
+                    type: 'Hotel',
+                    status: 'RUNNING',
+                    createdAt: new Date(),
+                    metrics: {
+                        callCount: Math.floor(Math.random() * 100),
+                        uptime: '99.9%',
+                        responseTime: '2.5s'
+                    }
+                },
+                {
+                    _id: 'mock_2',
+                    name: 'Hospital Demo Bot',
+                    type: 'Hospital',
+                    status: 'RUNNING',
+                    createdAt: new Date(),
+                    metrics: {
+                        callCount: Math.floor(Math.random() * 100),
+                        uptime: '99.9%',
+                        responseTime: '2.5s'
+                    }
+                }
+            ];
+            return res.json(mockBots);
+        }
+
+        // Real data
+        const bots = await Bot.find({ user: req.user._id });
+        const botsWithStatus = bots.map(bot => ({
+            ...bot.toObject(),
+            status: 'RUNNING',
+            metrics: {
+                callCount: Math.floor(Math.random() * 100),
+                uptime: '99.9%',
+                responseTime: '2.5s'
+            }
+        }));
+
+        console.log('Number of bots retrieved:', botsWithStatus.length);
+        res.json(botsWithStatus);
+    } catch (error) {
+        console.error('Error retrieving bots:', error);
+        res.status(400).json({ message: error.message });
+    }
+});

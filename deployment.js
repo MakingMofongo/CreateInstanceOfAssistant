@@ -3,12 +3,15 @@ const { log } = require('console');
 const path = require('path');
 const fs = require('fs');
 const EventEmitter = require('events');
+const { writeFile } = require('fs').promises;
+const { promisify } = require('util');
+const exec = promisify(require('child_process').exec);
 
 const IS_WINDOWS = process.platform === 'win32';
 
-class DeploymentEmitter extends EventEmitter {}
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'canvas-replica-402316';
 
-const deploymentEmitter = new DeploymentEmitter();
+const deploymentEmitter = new EventEmitter();
 
 function sanitizeServiceName(name) {
     if (!name) return 'service-' + generateRandomString();
@@ -29,20 +32,34 @@ function generateRandomString() {
 }
 
 async function authenticateServiceAccount(keyFilePath) {
+    if (!keyFilePath) {
+        throw new Error('Key file path is required');
+    }
+
     if (process.env.IS_MOCK === 'true') {
         console.log('Mock: Authenticating service account');
         return Promise.resolve('Mock authentication successful');
     }
 
-    // Normalize path and wrap in quotes if it contains spaces
-    const normalizedPath = keyFilePath.replace(/\\/g, '/');
-    const quotedPath = `"${normalizedPath}"`;
-    
     try {
-        const keyFileContent = JSON.parse(fs.readFileSync(normalizedPath, 'utf8'));
-        const serviceAccountEmail = keyFileContent.client_email;
+        // Verify key file exists
+        if (!fs.existsSync(keyFilePath)) {
+            throw new Error(`Service account key file not found at: ${keyFilePath}`);
+        }
 
-        // Construct command with proper path formatting for Windows
+        // Read and validate key file content
+        const keyFileContent = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
+        if (!keyFileContent.client_email) {
+            throw new Error('Invalid service account key file: missing client_email');
+        }
+
+        const serviceAccountEmail = keyFileContent.client_email;
+        
+        // Normalize path and wrap in quotes if it contains spaces
+        const normalizedPath = keyFilePath.replace(/\\/g, '/');
+        const quotedPath = `"${normalizedPath}"`;
+        
+        // Construct command with proper path formatting
         const command = IS_WINDOWS ? 
             `gcloud auth activate-service-account ${serviceAccountEmail} --key-file=${quotedPath}` :
             `gcloud auth activate-service-account ${serviceAccountEmail} --key-file=${quotedPath}`;
@@ -50,57 +67,256 @@ async function authenticateServiceAccount(keyFilePath) {
         console.log('Executing auth command:', command);
 
         const result = await executeCommand(command);
-        if (result.output.includes('Activated service account credentials')) {
+        
+        // Check for successful activation in both output and errorOutput
+        const outputText = (result.output || '').toLowerCase();
+        const errorText = (result.errorOutput || '').toLowerCase();
+        
+        // More lenient success check - look for various success indicators
+        const successIndicators = [
+            'activated service account credentials',
+            'activated credentials',
+            'successfully activated'
+        ];
+        
+        const isSuccess = successIndicators.some(indicator => 
+            outputText.includes(indicator.toLowerCase()) || 
+            errorText.includes(indicator.toLowerCase())
+        );
+
+        if (isSuccess) {
             console.log('Service account authenticated successfully');
             return 'Authentication successful';
-        } else {
-            throw new Error('Unexpected authentication output');
         }
+
+        // If we got output but no success indicators, log it for debugging
+        if (outputText || errorText) {
+            console.log('Authentication output:', outputText);
+            console.log('Authentication errors:', errorText);
+        }
+
+        // Verify authentication status directly
+        try {
+            const verifyCommand = 'gcloud auth list --filter=status:ACTIVE --format="value(account)"';
+            const verifyResult = await executeCommand(verifyCommand);
+            const activeAccounts = verifyResult.output.trim().split('\n');
+            
+            if (activeAccounts.includes(serviceAccountEmail)) {
+                console.log('Service account verified as active');
+                return 'Authentication successful';
+            }
+        } catch (verifyError) {
+            console.error('Failed to verify authentication status:', verifyError);
+        }
+
+        throw new Error('Authentication status could not be confirmed');
     } catch (error) {
         console.error('Authentication failed:', error);
-        throw error;
+        // Add more context to the error
+        throw new Error(`Authentication failed: ${error.message}\nCommand output: ${error.output || 'No output'}\nError output: ${error.errorOutput || 'No error output'}`);
     }
 }
 
-async function deployment(serviceName, folderName, randomSuffix, settings = {}) {
-    const isMockMode = settings.IS_MOCK || process.env.IS_MOCK === 'true';
-    console.log('Deployment starting with settings:', settings);
-    console.log('Original serviceName:', serviceName);
-    
-    // Sanitize the base service name
-    const baseServiceName = sanitizeServiceName(serviceName.split('-')[0]);
-    
-    // Add the random suffix
-    const finalServiceName = `${baseServiceName}-${randomSuffix}`;
-
-    // Ensure the final name is not longer than 63 characters
-    const truncatedServiceName = finalServiceName.slice(0, 63);
-
-    console.log('Final sanitized service name:', truncatedServiceName);
-
-    const projectId = 'canvas-replica-402316';
-
-    let command;
-    if (folderName === null) {
-        // For empty deployment, create a simple Express server
-        const tempDir = 'temp_empty_service';
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir);
-        }
+// Update executeCommand to be simpler and more reliable
+function executeCommand(command, folder_name) {
+    return new Promise((resolve, reject) => {
+        console.log(`[${new Date().toISOString()}] Executing command:`, command);
         
-        // Create package.json
-        const packageJson = {
-            "name": "empty-service",
-            "version": "1.0.0",
-            "main": "server.js",
-            "dependencies": {
-                "express": "^4.17.1"
-            }
-        };
-        fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+        let cmdProcess;
+        const processEnv = { ...process.env, CLOUDSDK_CORE_DISABLE_PROMPTS: '1' };
 
-        // Create server.js
-        const serverContent = `
+        // For tracking build progress
+        let isCompleted = false;
+        
+        // Emit heartbeat every 30 seconds
+        const heartbeatInterval = setInterval(() => {
+            if (!isCompleted && command.includes('gcloud builds submit')) {
+                const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+                deploymentEmitter.emit('heartbeat', {
+                    status: 'Deploying',
+                    message: `Build in progress - ${elapsedMinutes}m elapsed`,
+                    elapsedMinutes
+                });
+            }
+        }, 30000);
+
+        const startTime = Date.now();
+
+        // Create process based on platform
+        if (IS_WINDOWS) {
+            const args = command.match(/(?:[^\s"]+|"[^"]*")+/g);
+            const cmd = args.shift();
+            cmdProcess = spawn(cmd, args, { 
+                shell: true,
+                cwd: folder_name || undefined,
+                env: processEnv
+            });
+        } else {
+            cmdProcess = spawn('/bin/bash', ['-c', command], {
+                cwd: folder_name || undefined,
+                env: processEnv
+            });
+        }
+
+        let output = '';
+        let errorOutput = '';
+
+        cmdProcess.stdout.on('data', (data) => {
+            const text = data.toString();
+            output += text;
+            console.log(`[${new Date().toISOString()}] ${text.trim()}`);
+        });
+
+        cmdProcess.stderr.on('data', (data) => {
+            const text = data.toString();
+            errorOutput += text;
+            console.error(text.trim());
+        });
+
+        cmdProcess.on('close', (code) => {
+            clearInterval(heartbeatInterval);
+            isCompleted = true;
+
+            if (code !== 0) {
+                const error = new Error(`Command failed with code ${code}`);
+                error.code = code;
+                error.output = output;
+                error.errorOutput = errorOutput;
+                error.cmd = command;
+                reject(error);
+                return;
+            }
+
+            // If this was a build command, emit completion
+            if (command.includes('gcloud builds submit')) {
+                deploymentEmitter.emit('progress', {
+                    status: 'Final Configuration',
+                    stage: 'Deployment complete!',
+                    progress: 100,
+                    buildMessage: 'Deployment successful'
+                });
+            }
+
+            resolve({ success: true, output, message: 'Command successful' });
+        });
+
+        cmdProcess.on('error', (error) => {
+            clearInterval(heartbeatInterval);
+            isCompleted = true;
+            error.output = output;
+            error.errorOutput = errorOutput;
+            error.cmd = command;
+            reject(error);
+        });
+    });
+}
+
+// Update deployment function to be simpler
+async function deployment(serviceName, folderName, randomSuffix, settings = {}) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const isMockMode = settings.IS_MOCK || process.env.IS_MOCK === 'true';
+            
+            if (isMockMode) {
+                const mockResult = await mockDeployment(serviceName);
+                resolve(mockResult);
+                return;
+            }
+
+            // Emit initial progress
+            deploymentEmitter.emit('progress', {
+                status: 'Final Configuration',
+                stage: 'Starting deployment...',
+                progress: 10
+            });
+
+            // Configure Docker and prepare deployment
+            await configureDockerAuth();
+            
+            const baseServiceName = sanitizeServiceName(serviceName.split('-')[0]);
+            const finalServiceName = `${baseServiceName}-${randomSuffix}`;
+            const truncatedServiceName = finalServiceName.slice(0, 63);
+            
+            let sourceDir = folderName;
+            if (!folderName) {
+                sourceDir = await createEmptyService();
+            }
+
+            try {
+                // Execute build command
+                const command = `gcloud builds submit "${sourceDir}" --config="${sourceDir}/cloudbuild.yaml" --substitutions=_SERVICE_NAME=${truncatedServiceName} --timeout=600s --verbosity=info`;
+                const result = await executeCommand(command);
+
+                // Extract service URL
+                const urlMatch = result.output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
+                const serviceUrl = urlMatch ? `${urlMatch[1]}/login` : null;
+
+                if (!serviceUrl) {
+                    throw new Error('Failed to obtain service URL');
+                }
+
+                resolve({
+                    success: true,
+                    serviceUrl,
+                    output: result.output
+                });
+            } finally {
+                // Clean up temp directory if created
+                if (!folderName && sourceDir) {
+                    fs.rmSync(sourceDir, { recursive: true, force: true });
+                }
+            }
+        } catch (error) {
+            console.error('Deployment error:', error);
+            reject(error);
+        }
+    });
+}
+
+// Add function to configure Docker authentication
+async function configureDockerAuth() {
+    try {
+        const result = await executeCommand('gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet');
+        console.log('Docker authentication configured:', result);
+    } catch (error) {
+        console.error('Failed to configure Docker auth:', error);
+        // Continue anyway as it might already be configured
+    }
+}
+
+async function createEmptyService() {
+    const tempDir = 'temp_empty_service';
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir);
+    }
+    
+    // Create package.json
+    const packageJson = {
+        "name": "empty-service",
+        "version": "1.0.0",
+        "main": "server.js",
+        "dependencies": {
+            "express": "^4.17.1"
+        }
+    };
+    await writeFile(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+
+    // Copy package-lock.json from Source directory
+    try {
+        await fs.promises.copyFile(
+            path.join(__dirname, 'Source', 'package-lock.json'),
+            path.join(tempDir, 'package-lock.json')
+        );
+        console.log('Successfully copied package-lock.json from Source');
+    } catch (error) {
+        console.error('Error copying package-lock.json:', error);
+        // If copy fails, generate package-lock.json using npm install
+        console.log('Generating package-lock.json using npm install...');
+        await executeCommand('npm install', tempDir);
+    }
+
+    // Create server.js
+    const serverContent = `
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 8080;
@@ -113,138 +329,171 @@ app.listen(port, () => {
     console.log(\`Server running on port \${port}\`);
 });
 `;
-        fs.writeFileSync(path.join(tempDir, 'server.js'), serverContent);
+    await writeFile(path.join(tempDir, 'server.js'), serverContent);
 
-        // Create Dockerfile
-        const dockerfileContent = `
-FROM node:14
+    // Create Dockerfile
+    const dockerfileContent = `
+# Build stage
+FROM node:18-alpine AS builder
+
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+
+# Copy package files first to leverage cache
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy rest of the application
 COPY . .
+
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy only necessary files from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/*.js ./
+
+# Expose port
+EXPOSE 8080
+
+# Start the application
 CMD [ "node", "server.js" ]
 `;
-        fs.writeFileSync(path.join(tempDir, 'Dockerfile'), dockerfileContent);
+    await writeFile(path.join(tempDir, 'Dockerfile'), dockerfileContent);
+
+    // Create cloudbuild.yaml with enhanced logging
+    const cloudBuildContent = `steps:
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - '--destination=asia-south1-docker.pkg.dev/\${PROJECT_ID}/docker-repo/\${_SERVICE_NAME}'
+      - '--cache=true'
+      - '--cache-ttl=24h'
+      - '--context=.'
+      - '--dockerfile=./Dockerfile'
+      - '--build-arg=PORT=8080'
+      - '--verbosity=info'
+      - '--log-format=text'
+      - '--log-timestamp'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-service'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Starting temporary service deployment..."
+        echo "Service name: \${_SERVICE_NAME}"
+        echo "Region: asia-south1"
         
-        command = `gcloud run deploy ${truncatedServiceName} --source ${tempDir} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
-    } else {
-        command = `gcloud run deploy ${truncatedServiceName} --source ${folderName} --region=asia-south1 --allow-unauthenticated --project=${projectId}`;
-    }
+        gcloud run deploy \${_SERVICE_NAME} \\
+          --image=asia-south1-docker.pkg.dev/\${PROJECT_ID}/docker-repo/\${_SERVICE_NAME} \\
+          --region=asia-south1 \\
+          --platform=managed \\
+          --allow-unauthenticated \\
+          --project=\${PROJECT_ID} \\
+          --format=json \\
+          --verbosity=info
 
-    console.log('Executing command:', command);
+        echo "Temporary service deployment completed"
 
-    if (isMockMode) {
-        return mockDeployment(finalServiceName);
-    }
-
-    try {
-        const result = await executeCommand(command, folderName);
-        console.log('Deployment result:', result);
-        
-        // Extract the URL from the deployment output
-        const urlMatch = result.output.match(/Service URL:\s*(https:\/\/[^\s]+)/);
-        const serviceUrl = urlMatch ? urlMatch[1] : null;
-
-        console.log('Extracted Service URL:', serviceUrl);
-
-        return {
-            ...result,
-            serviceUrl: serviceUrl
-        };
-    } catch (error) {
-        console.log('Deployment error:', error);
-        throw error;
-    }
+substitutions:
+  _SERVICE_NAME: default-service-name`;
+    
+    await writeFile(path.join(tempDir, 'cloudbuild.yaml'), cloudBuildContent.replace(/\${PROJECT_ID}/g, PROJECT_ID));
+    
+    return tempDir;
 }
 
-function executeCommand(command, folder_name) {
-    return new Promise((resolve, reject) => {
-        console.log('Starting command execution:', command);
-        
-        // For Windows, we need to handle the command differently
-        let process;
-        if (IS_WINDOWS) {
-            // Split command into command and args, preserving quoted strings
-            const args = command.match(/(?:[^\s"]+|"[^"]*")+/g);
-            const cmd = args.shift();
-            process = spawn(cmd, args, { shell: true });
-        } else {
-            process = spawn('sh', ['-c', command]);
+// Add retry logic and proxy handling
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
+
+// Add a function to check network connectivity
+async function checkNetworkConnectivity() {
+    try {
+        const result = await executeCommand('gcloud info --run-diagnostics');
+        return result.output.includes('Network diagnostic passed') || 
+               result.output.includes('Compute Engine API') ||  // Additional success indicators
+               result.output.includes('Cloud Run API');
+    } catch (error) {
+        console.error('Network diagnostic failed:', error);
+        // If we can execute the command but get an error, we still have connectivity
+        if (error.output || error.errorOutput) {
+            return true;
         }
-
-        let output = '';
-        let currentStep = '';
-        let buildingContainerProgress = 0;
-
-        process.stdout.on('data', (data) => {
-            const chunk = data.toString();
-            output += chunk;
-            console.log('Command output:', chunk.trim());
-
-            if (chunk.includes('Building using Dockerfile')) {
-                currentStep = 'Building using Dockerfile';
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 0 });
-            } else if (chunk.includes('Uploading sources')) {
-                currentStep = 'Uploading sources';
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 10 });
-            } else if (chunk.includes('Building Container')) {
-                currentStep = 'Building Container';
-                buildingContainerProgress += 1;
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 10 + (buildingContainerProgress * 0.5) });
-            } else if (chunk.includes('Setting IAM Policy')) {
-                currentStep = 'Setting IAM Policy';
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 70 });
-            } else if (chunk.includes('Creating Revision')) {
-                currentStep = 'Creating Revision';
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 80 });
-            } else if (chunk.includes('Routing traffic')) {
-                currentStep = 'Routing traffic';
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 90 });
-            } else if (chunk.includes('Service URL:')) {
-                currentStep = 'Deployment complete';
-                deploymentEmitter.emit('progress', { step: currentStep, progress: 100 });
-            }
-        });
-
-        process.stderr.on('data', (data) => {
-            const chunk = data.toString();
-            output += chunk;
-            // Only log as error if it contains error-indicating words
-            if (chunk.toLowerCase().includes('error') || chunk.toLowerCase().includes('failed')) {
-                console.error('Command error:', chunk.trim());
-            } else {
-                console.log('Command output (stderr):', chunk.trim());
-            }
-        });
-
-        process.on('close', (code) => {
-            console.log(`Command process exited with code ${code}`);
-            if (code !== 0) {
-                reject({ success: false, message: `Command failed with code ${code}`, output });
-                return;
-            }
-
-            resolve({ 
-                success: true, 
-                output: output,
-                message: 'Command successful'
-            });
-
-            // Clean up temporary directory if it was created
-            if (folder_name === null) {
-                fs.rmSync('temp_empty_service', { recursive: true, force: true });
-            }
-        });
-    });
+        return false;
+    }
 }
 
 function mockDeployment(serviceName) {
     console.log('Mock: Deploying service', serviceName);
-    return Promise.resolve({
-        success: true,
-        serviceUrl: `https://${serviceName}-mock-url.asia-south1.run.app`,
-        fullServiceName: serviceName,
-        message: 'Mock deployment successful'
+    
+    // Emit initial progress
+    deploymentEmitter.emit('progress', {
+        status: 'Final Configuration',
+        stage: 'Starting mock deployment...',
+        progress: 10,
+        buildMessage: 'Initializing mock deployment'
+    });
+
+    // Return a promise that resolves after simulating deployment steps
+    return new Promise((resolve) => {
+        // Simulate deployment steps with timeouts
+        setTimeout(() => {
+            deploymentEmitter.emit('progress', {
+                status: 'Final Configuration',
+                stage: 'Building mock container...',
+                progress: 30,
+                buildMessage: 'Building mock container'
+            });
+        }, 1000);
+
+        setTimeout(() => {
+            deploymentEmitter.emit('progress', {
+                status: 'Final Configuration',
+                stage: 'Configuring mock service...',
+                progress: 60,
+                buildMessage: 'Configuring mock service'
+            });
+        }, 2000);
+
+        setTimeout(() => {
+            deploymentEmitter.emit('progress', {
+                status: 'Final Configuration',
+                stage: 'Finalizing mock deployment...',
+                progress: 90,
+                buildMessage: 'Finalizing mock deployment'
+            });
+        }, 3000);
+
+        // Resolve with mock data after all steps
+        setTimeout(() => {
+            // Emit final progress update
+            deploymentEmitter.emit('progress', {
+                status: 'Final Configuration',
+                stage: 'Deployment complete!',
+                progress: 100,
+                buildMessage: 'Mock deployment successful'
+            });
+
+            // Generate mock credentials
+            const mockCredentials = {
+                username: 'mock_user_' + Math.random().toString(36).substring(7),
+                password: 'mock_pass_' + Math.random().toString(36).substring(7)
+            };
+
+            // Resolve with mock data
+            resolve({
+                success: true,
+                serviceUrl: `https://${serviceName}-mock-url.asia-south1.run.app/login`,
+                fullServiceName: serviceName,
+                message: 'Mock deployment successful',
+                ...mockCredentials
+            });
+        }, 4000);
     });
 }
 

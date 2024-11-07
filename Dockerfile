@@ -21,6 +21,7 @@ COPY public ./public
 COPY Source ./Source
 COPY models ./models
 COPY middleware ./middleware
+COPY routes ./routes
 
 # Create the hotel_data directory
 RUN mkdir -p hotel_data && chmod 777 hotel_data

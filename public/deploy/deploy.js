@@ -9,19 +9,81 @@ const state = {
     eventSource: null
 };
 
+// Quick test data
+const quickTestData = {
+    botType: 'Hotel',
+    hotelName: 'Test Hotel Bot',
+    email: 'test@example.com',
+    hotelStars: '4',
+    hotelRooms: '100',
+    hotelAmenities: 'Pool, Spa, Restaurant, Gym',
+    hotelDescription: 'A luxury test hotel in the heart of the city',
+    hotelPolicies: 'Check-in: 3 PM, Check-out: 11 AM, No smoking'
+};
+
+// Add these constants at the top
+const DEPLOYMENT_STORAGE_KEY = 'ongoing_deployment';
+const DEPLOYMENT_PROGRESS_KEY = 'deployment_progress';
+const DEPLOYMENT_EXPIRY_TIME = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+
 // Initialize on page load
+// Update the initialization code in the DOMContentLoaded event listener
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAuthStatus();
-    initializeBotTypeSelection();
+    
+    // Check URL parameters first
+    const urlParams = new URLSearchParams(window.location.search);
+    const step = urlParams.get('step');
+    const requestId = urlParams.get('requestId');
+    
+    if (step === '4' && requestId) {
+        console.log('Found deployment in URL:', requestId);
+        const deploymentData = localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
+        
+        if (deploymentData) {
+            try {
+                const { formData, timestamp } = JSON.parse(deploymentData);
+                const age = Date.now() - timestamp;
+                
+                // Only restore if deployment is less than 30 minutes old
+                if (age < 30 * 60 * 1000) {
+                    console.log('Restoring deployment state for requestId:', requestId);
+                    state.formData = formData;
+                    state.currentRequestId = requestId;
+                    
+                    // Skip to deployment step
+                    updateStepIndicator(4);
+                    
+                    // Show deployment UI
+                    showDeploymentUI();
+                    
+                    // Reconnect to SSE
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        console.log('Reconnecting to SSE with requestId:', requestId);
+                        startEventStream(requestId, token);
+                    }
+                } else {
+                    console.log('Deployment state too old, starting fresh');
+                    localStorage.removeItem(DEPLOYMENT_STORAGE_KEY);
+                    initializeBotTypeSelection();
+                }
+            } catch (error) {
+                console.error('Error restoring deployment state:', error);
+                initializeBotTypeSelection();
+            }
+        } else {
+            console.log('No deployment data found for requestId:', requestId);
+            initializeBotTypeSelection();
+        }
+    } else {
+        // Normal initialization
+        initializeBotTypeSelection();
+    }
+    
     setupEventListeners();
     checkMockMode();
-    
-    // Add this to handle back navigation
-    window.addEventListener('popstate', (event) => {
-        if (event.state && event.state.step) {
-            showStep(event.state.step);
-        }
-    });
+    setupQuickTest();
 });
 
 // Authentication check
@@ -60,11 +122,229 @@ async function updateUserDisplay() {
     }
 }
 
+// Update the createCompletionCard function to generate the completion card HTML
+function createCompletionCard() {
+    return `
+        <div class="bg-gradient-to-br from-koko-purple-50 to-white p-8 rounded-xl shadow-xl border border-koko-purple-100">
+            <div class="flex items-center justify-center mb-8">
+                <div class="w-16 h-16 bg-koko-purple-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-check text-3xl text-koko-purple-600"></i>
+                </div>
+            </div>
+
+            <h3 class="text-2xl font-bold text-center text-gray-900 mb-8">
+                Your AI Receptionist is Ready! 🎉
+            </h3>
+
+            <div class="space-y-6">
+                <!-- Credentials Section -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-gray-700">Phone Number</span>
+                            <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedPhoneNumber"></span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-gray-700">Service URL</span>
+                            <a href="#" class="text-sm font-mono text-koko-purple-600 hover:text-koko-purple-700" id="deployedServiceUrl" target="_blank"></a>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-gray-700">Username</span>
+                            <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedUsername"></span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-gray-700">Password</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedPassword">••••••••</span>
+                                <button onclick="togglePassword('deployed')" class="text-koko-purple-600 hover:text-koko-purple-700">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warning Message -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                Please save these credentials securely. They will not be shown again.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-4">
+                    <button onclick="copyCredentials()" class="btn-secondary">
+                        <i class="fas fa-copy mr-2"></i>
+                        Copy Credentials
+                    </button>
+                    <button onclick="window.location.href='/dashboard'" class="btn-primary">
+                        <i class="fas fa-tachometer-alt mr-2"></i>
+                        Go to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+
+// Add this function near the top
+function setupEventListeners() {
+    // Add any global event listeners here
+    console.log('Setting up event listeners');
+}
+// Update handleDeploymentComplete function
+// Update the handleDeploymentComplete function
+function handleDeploymentComplete(data) {
+    console.log('Deployment completed with data:', data);
+    
+    // Get current state and update it
+    const currentState = localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
+    const deploymentState = currentState ? JSON.parse(currentState) : {};
+    
+    // Update state while preserving lastKnownState
+    const updatedState = {
+        ...deploymentState,
+        requestId: state.currentRequestId,
+        formData: state.formData,
+        completionData: data,
+        timestamp: Date.now(),
+        status: 'completed',
+        lastKnownState: data // Store completion data as last known state too
+    };
+    
+    localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify(updatedState));
+    
+    // Get the deployment complete section
+    const deploymentComplete = document.getElementById('deploymentComplete');
+    if (!deploymentComplete) {
+        console.error('Deployment complete section not found');
+        // Try to find the formContent and add the deploymentComplete div if it doesn't exist
+        const formContent = document.getElementById('formContent');
+        if (formContent) {
+            const deploymentCompleteDiv = document.createElement('div');
+            deploymentCompleteDiv.id = 'deploymentComplete';
+            deploymentCompleteDiv.className = 'mt-8';
+            formContent.appendChild(deploymentCompleteDiv);
+        }
+        return;
+    }
+
+    console.log('Inserting completion card HTML');
+    
+    // Insert the completion card HTML
+    deploymentComplete.innerHTML = createCompletionCard();
+
+    // Update the credential values
+    if (data.serviceUrl) {
+        const serviceUrlElement = document.getElementById('deployedServiceUrl');
+        if (serviceUrlElement) {
+            serviceUrlElement.href = data.serviceUrl;
+            serviceUrlElement.textContent = new URL(data.serviceUrl).hostname;
+        }
+    }
+
+    if (data.phoneNumber) {
+        const phoneElement = document.getElementById('deployedPhoneNumber');
+        if (phoneElement) {
+            phoneElement.textContent = data.phoneNumber;
+        }
+    }
+
+    if (data.username) {
+        const usernameElement = document.getElementById('deployedUsername');
+        if (usernameElement) {
+            usernameElement.textContent = data.username;
+        }
+    }
+
+    if (data.password) {
+        window.deployedPassword = data.password;
+        const passwordElement = document.getElementById('deployedPassword');
+        if (passwordElement) {
+            passwordElement.textContent = '••••••••';
+        }
+    }
+
+    // Force display block and remove hidden class
+    deploymentComplete.style.removeProperty('display');
+    deploymentComplete.classList.remove('hidden');
+
+    // Debug log
+    console.log('Deployment complete element:', deploymentComplete);
+    console.log('Display style:', deploymentComplete.style.display);
+    console.log('Classes:', deploymentComplete.className);
+
+    // Make sure parent containers are visible
+    let parent = deploymentComplete.parentElement;
+    while (parent) {
+        parent.classList.remove('hidden');
+        if (parent.style) {
+            parent.style.removeProperty('display');
+        }
+        console.log('Parent element:', parent);
+        console.log('Parent display:', parent.style.display);
+        parent = parent.parentElement;
+    }
+
+    // Scroll to the completion section
+    setTimeout(() => {
+        deploymentComplete.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
+    // Show success toast
+    showToast('Deployment completed successfully!', 'success');
+
+    // Update all progress steps to completed state
+    const steps = document.querySelectorAll('.progress-step');
+    steps.forEach(step => {
+        step.classList.add('completed');
+        step.classList.remove('active');
+        const progressBar = step.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.style.width = '100%';
+        }
+    });
+
+    // Start celebration effect
+    startCelebration();
+
+    console.log('Deployment completion handler finished');
+}
+function togglePassword(type) {
+    const passwordElement = document.getElementById(`${type}Password`);
+    const passwordValue = window[`${type}Password`];
+    
+    if (passwordElement.textContent === '••••••••') {
+        passwordElement.textContent = passwordValue;
+    } else {
+        passwordElement.textContent = '••••••••';
+    }
+}
 // Bot Type Selection
 function initializeBotTypeSelection() {
     const formContent = document.getElementById('formContent');
     if (!formContent) return;
 
+    // Preserve the quick test button if it exists
+    const quickTestButton = formContent.querySelector('#quickTestButton')?.parentElement;
+    
     const botTypes = [
         {
             id: 'hotel',
@@ -87,6 +367,16 @@ function initializeBotTypeSelection() {
     ];
 
     formContent.innerHTML = `
+        <!-- Quick Test Button -->
+        <div class="mb-8 text-center">
+            <button id="quickTestButton" class="bg-koko-purple-100 text-koko-purple-700 px-6 py-3 rounded-lg hover:bg-koko-purple-200 transition-colors duration-200 flex items-center mx-auto">
+                <i class="fas fa-bolt mr-2"></i>
+                Quick Test Deployment
+                <span class="text-xs ml-2 text-koko-purple-600">(Hotel Bot)</span>
+            </button>
+        </div>
+
+        <!-- Bot Type Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             ${botTypes.map(type => `
                 <div class="bot-type-card cursor-pointer border border-gray-200 p-6 hover:border-koko-purple-600 transition-all"
@@ -101,6 +391,8 @@ function initializeBotTypeSelection() {
         </div>
     `;
 
+    // Add event listeners after setting innerHTML
+    setupQuickTest(); // Re-attach quick test button listener
     formContent.querySelectorAll('.bot-type-card').forEach(card => {
         card.addEventListener('click', () => handleBotTypeSelection(card));
     });
@@ -485,7 +777,7 @@ function setupPlanSelectionListeners() {
                     plan.classList.remove('border-koko-purple-600', 'ring-2');
                 });
                 
-                // Add selection to clicked plan
+                // Add selection to clicked card
                 selectedPlan.classList.add('border-koko-purple-600', 'ring-2');
                 
                 // Store selected plan data
@@ -647,6 +939,15 @@ async function startDeployment() {
         // Initialize progress steps
         initializeProgressSteps();
 
+        // Store initial deployment state
+        const deploymentState = {
+            requestId,
+            formData: state.formData,
+            timestamp: Date.now(),
+            status: 'in_progress'
+        };
+        localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify(deploymentState));
+
     } catch (error) {
         console.error('Deployment error:', error);
         showToast('Deployment failed: ' + error.message, 'error');
@@ -654,37 +955,66 @@ async function startDeployment() {
     }
 }
 
-// Initialize progress steps
+// Update the progress steps HTML
+// Update the connection status HTML
+// Update the progress steps HTML
 function initializeProgressSteps() {
-    const steps = [
-        { title: 'Initializing', description: 'Setting up deployment environment' },
-        { title: 'Creating Knowledge Base', description: 'Building AI knowledge base' },
-        { title: 'Training Model', description: 'Training AI model with your data' },
-        { title: 'Cloud Setup', description: 'Setting up cloud infrastructure' },
-        { title: 'Final Configuration', description: 'Configuring your AI receptionist' }
-    ];
-
     const progressContainer = document.getElementById('progressSteps');
     if (!progressContainer) return;
 
-    progressContainer.innerHTML = steps.map((step, index) => `
-        <div class="progress-step ${index === 0 ? 'active' : ''}" data-step="${index}">
-            <div class="flex items-center">
-                <div class="w-8 h-8 bg-gray-200 text-gray-600 flex items-center justify-center">
-                    ${index + 1}
-                </div>
-                <div class="ml-4">
-                    <h4 class="font-medium text-gray-900">${step.title}</h4>
-                    <p class="text-sm text-gray-500">${step.description}</p>
-                </div>
+    // Create the main container
+    progressContainer.innerHTML = `
+        <!-- Connection Status Indicator -->
+        <div id="connectionStatus" class="connection-status hidden">
+            <div class="connection-pulse"></div>
+            <div class="connection-message">
+                <span class="font-medium">Live Connection</span>
+                <span class="loading-dots">Processing</span>
             </div>
-            <div class="mt-2 relative pt-1">
-                <div class="overflow-hidden h-2 text-xs flex bg-gray-200">
-                    <div class="progress-bar w-0 shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-koko-purple-600 transition-all duration-500"></div>
-                </div>
-            </div>
+            <div class="connection-time" id="elapsedTime">0:00</div>
         </div>
-    `).join('');
+
+        <!-- Progress Steps -->
+        ${[
+            { title: 'Initializing', description: 'Setting up deployment environment' },
+            { title: 'Creating Knowledge Base', description: 'Building AI knowledge base' },
+            { title: 'Training Model', description: 'Training AI model with your data' },
+            { title: 'Cloud Setup', description: 'Setting up cloud infrastructure' },
+            { title: 'Final Configuration', description: 'Configuring your AI receptionist' }
+        ].map((step, index) => `
+            <div class="progress-step ${index === 0 ? 'active' : ''}" data-step="${index}">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-gray-200 text-gray-600 flex items-center justify-center">
+                        ${index + 1}
+                    </div>
+                    <div class="ml-4">
+                        <h4 class="font-medium text-gray-900">${step.title}</h4>
+                        <p class="text-sm text-gray-500">${step.description}</p>
+                    </div>
+                </div>
+                <div class="mt-2 relative pt-1">
+                    <div class="overflow-hidden h-2 text-xs flex bg-gray-200">
+                        <div class="progress-bar w-0 shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-koko-purple-600 transition-all duration-500"></div>
+                    </div>
+                </div>
+            </div>
+        `).join('')}
+    `;
+
+    // Initialize elapsed time counter
+    startTime = Date.now();
+    setInterval(updateElapsedTime, 1000);
+}
+// Add elapsed time tracking
+let startTime;
+function updateElapsedTime() {
+    const elapsedTimeElement = document.getElementById('elapsedTime');
+    if (!elapsedTimeElement || !startTime) return;
+
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    elapsedTimeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')} elapsed`;
 }
 
 // Start event stream for deployment updates
@@ -694,22 +1024,200 @@ function startEventStream(requestId) {
     }
 
     const token = localStorage.getItem('token');
-    state.eventSource = new EventSource(`/create-bot?requestId=${requestId}&token=${token}`);
+    state.eventSource = createEventSource(requestId, token);
+}
 
-    state.eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleDeploymentUpdate(data);
+// Add this function to show live connection status
+function updateConnectionStatus(isActive) {
+    const statusIndicator = document.getElementById('connectionStatus');
+    if (!statusIndicator) return;
+
+    if (isActive) {
+        statusIndicator.classList.remove('hidden');
+        statusIndicator.classList.add('connection-active');
+    } else {
+        statusIndicator.classList.remove('connection-active');
+        statusIndicator.classList.add('hidden');
+    }
+}
+
+// Update createEventSource to handle connection status
+function createEventSource(requestId, token) {
+    console.log('Creating EventSource for requestId:', requestId);
+    const url = `/create-bot?requestId=${requestId}&token=${token}`;
+    const eventSource = new EventSource(url);
+    
+    let retryCount = 0;
+    const maxRetries = 3;
+    let isCompleted = false;
+    let lastHeartbeat = Date.now();
+    let retryTimeout = null;
+    
+    // Update connection status with state
+    function updateConnectionStatusWithState(state, message) {
+        const statusIndicator = document.getElementById('connectionStatus');
+        if (!statusIndicator) return;
+
+        const messageElement = statusIndicator.querySelector('.connection-message');
+        if (messageElement) {
+            messageElement.innerHTML = `
+                <span class="font-medium">${state}</span>
+                <span class="loading-dots">${message || ''}</span>
+            `;
+        }
+
+        statusIndicator.className = 'connection-status';
+        switch (state) {
+            case 'Connected':
+                statusIndicator.classList.add('connection-active');
+                break;
+            case 'Retrying':
+                statusIndicator.classList.add('connection-warning');
+                break;
+            case 'Failed':
+                statusIndicator.classList.add('connection-error');
+                break;
+        }
+        statusIndicator.classList.remove('hidden');
+    }
+    
+    // Set up heartbeat checker immediately
+    const heartbeatChecker = setInterval(() => {
+        const timeSinceLastHeartbeat = Date.now() - lastHeartbeat;
+        if (timeSinceLastHeartbeat < 20000) {
+            updateConnectionStatusWithState('Connected', 'Server responding');
+        } else {
+            updateConnectionStatusWithState('Warning', 'Waiting for server response');
+        }
+    }, 1000);
+
+    eventSource.onmessage = (event) => {
+        lastHeartbeat = Date.now();
+        try {
+            // Handle empty heartbeat
+            if (!event.data) {
+                console.log('Received heartbeat');
+                return;
+            }
+
+            const data = JSON.parse(event.data);
+            console.log('SSE update received:', data);
+            
+            // Always store the latest state first, before processing
+            const currentState = localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
+            const deploymentState = currentState ? JSON.parse(currentState) : {};
+            
+            // Update with latest data while preserving existing info
+            const updatedState = {
+                ...deploymentState,
+                requestId: state.currentRequestId,
+                formData: state.formData,
+                timestamp: Date.now(),
+                lastKnownState: data // Store every update as last known state
+            };
+
+            if (data.status === 'heartbeat') {
+                // Format the heartbeat message to include elapsed time
+                const message = data.message || `Build in progress - ${data.elapsedMinutes}m elapsed`;
+                const heartbeatData = {
+                    ...data,
+                    message,
+                    stage: message // Add stage property for consistency
+                };
+                
+                updateConnectionStatusWithState('Connected', message);
+                updateProgressStep(heartbeatData); // Pass the formatted heartbeat data
+                localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify(updatedState));
+                return;
+            }
+
+            if (data.status === 'completed') {
+                isCompleted = true;
+                clearInterval(heartbeatChecker);
+                updateConnectionStatusWithState('Connected', 'Deployment complete');
+                console.log('Calling handleDeploymentComplete with data:', data);
+                
+                // Update state with completion data but preserve lastKnownState
+                updatedState.status = 'completed';
+                updatedState.completionData = data;
+                localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify(updatedState));
+                
+                handleDeploymentComplete(data);
+                eventSource.close();
+            } else if (data.error) {
+                clearInterval(heartbeatChecker);
+                updateConnectionStatusWithState('Failed', data.error);
+                updatedState.status = 'error';
+                updatedState.error = data.error;
+                localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify(updatedState));
+                showDeploymentError(data.error);
+                eventSource.close();
+            } else {
+                // Store progress state
+                updatedState.status = 'in_progress';
+                localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify(updatedState));
+                updateProgressStep(data);
+            }
+        } catch (error) {
+            console.error('Error processing SSE message:', error);
+        }
     };
 
-    state.eventSource.onerror = (error) => {
+    eventSource.onopen = () => {
+        console.log('SSE connection opened');
+        retryCount = 0; // Reset retry count on successful connection
+        updateConnectionStatusWithState('Connected', 'Server connected');
+    };
+
+    eventSource.onerror = (error) => {
         console.error('EventSource error:', error);
-        state.eventSource.close();
-        showToast('Lost connection to deployment server', 'error');
+        
+        if (isCompleted) {
+            clearInterval(heartbeatChecker);
+            eventSource.close();
+            return;
+        }
+
+        // Clear any existing retry timeout
+        if (retryTimeout) {
+            clearTimeout(retryTimeout);
+            retryTimeout = null;
+        }
+
+        if (retryCount < maxRetries) {
+            retryCount++;
+            updateConnectionStatusWithState('Retrying', `Attempt ${retryCount}/${maxRetries}`);
+            console.log(`Retrying connection (${retryCount}/${maxRetries})...`);
+            
+            // Close current connection before retrying
+            eventSource.close();
+            
+            retryTimeout = setTimeout(() => {
+                if (!isCompleted) {
+                    // Create new EventSource instance
+                    state.eventSource = createEventSource(requestId, token);
+                }
+            }, 2000 * retryCount); // Exponential backoff
+        } else {
+            clearInterval(heartbeatChecker);
+            updateConnectionStatusWithState('Failed', 'Connection lost - Please refresh page');
+            console.error('Max retries reached, giving up');
+            if (!isCompleted) {
+                showDeploymentError('Lost connection to deployment server - Please refresh page');
+            }
+            eventSource.close();
+        }
     };
+
+    return eventSource;
 }
 
 // Handle deployment updates
 function handleDeploymentUpdate(data) {
+    if (!startTime) {
+        startTime = Date.now();
+        setInterval(updateElapsedTime, 1000);
+    }
     console.log('Deployment update:', data);
 
     if (data.error) {
@@ -726,34 +1234,120 @@ function handleDeploymentUpdate(data) {
 }
 
 // Update progress step
-function updateProgressStep(data) {
-    const steps = document.querySelectorAll('.progress-step');
-    const currentStep = Array.from(steps).find(step => {
-        const title = step.querySelector('h4').textContent;
-        return title.toLowerCase().includes(data.status.toLowerCase());
-    });
+function updateProgressStep(data, isRestoration = false) {
+    console.log('Updating progress step:', data);
+    
+    // Skip temp service updates in UI
+    if (data.isTemp) {
+        return;
+    }
 
-    if (currentStep) {
-        // Update progress bar
+    // Handle heartbeat messages
+    if (data.status === 'heartbeat') {
+        // Find the currently active step
+        const activeStep = document.querySelector('.progress-step.active');
+        if (activeStep) {
+            const description = activeStep.querySelector('p');
+            if (description && data.message) {
+                // Update the stage description with the heartbeat message
+                description.textContent = data.message;
+            }
+            
+            // Update progress bar if provided
+            if (data.progress !== undefined) {
+                const progressBar = activeStep.querySelector('.progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = `${data.progress}%`;
+                }
+            }
+        }
+        return;
+    }
+
+    // Store this progress update if it's not a restoration
+    if (!isRestoration) {
+        const progressData = localStorage.getItem(DEPLOYMENT_PROGRESS_KEY);
+        let progress = progressData ? JSON.parse(progressData) : { updates: [] };
+        // Add timestamp to the update
+        progress.updates.push({
+            ...data,
+            timestamp: Date.now()
+        });
+        localStorage.setItem(DEPLOYMENT_PROGRESS_KEY, JSON.stringify(progress));
+    }
+
+    const steps = document.querySelectorAll('.progress-step');
+    let currentStep;
+
+    // Map status to step index to ensure correct order
+    const stepOrder = {
+        'Initializing': 0,
+        'Creating Knowledge Base': 1,
+        'Training Model': 2,
+        'Cloud Setup': 3,
+        'Final Configuration': 4,
+        'Deployment': 4 // Map Deployment status to Final Configuration step
+    };
+
+    if (data.status === 'Final Configuration' || data.status === 'Deployment') {
+        currentStep = steps[4]; // Always use the last step
+        
+        // Remove active class from all steps
+        steps.forEach(step => step.classList.remove('active'));
+        // Add active class to current step
+        currentStep.classList.add('active');
+        
         const progressBar = currentStep.querySelector('.progress-bar');
         if (progressBar) {
-            progressBar.style.width = `${data.progress || 0}%`;
+            const progress = data.progress || 0;
+            progressBar.style.width = `${progress}%`;
+            
+            // Update description if available
+            const description = currentStep.querySelector('p');
+            if (description && data.stage) {
+                description.textContent = data.stage;
+            }
         }
 
-        // Update step status
-        steps.forEach(step => step.classList.remove('active'));
-        currentStep.classList.add('active');
-
         // Mark previous steps as completed
-        let prevStep = currentStep.previousElementSibling;
-        while (prevStep) {
-            prevStep.classList.add('completed');
-            prevStep.querySelector('.progress-bar').style.width = '100%';
-            prevStep = prevStep.previousElementSibling;
+        steps.forEach((step, index) => {
+            if (index < 4) { // All steps before Final Configuration
+                step.classList.add('completed');
+                const prevProgressBar = step.querySelector('.progress-bar');
+                if (prevProgressBar) {
+                    prevProgressBar.style.width = '100%';
+                }
+            }
+        });
+    } else {
+        const stepIndex = stepOrder[data.status];
+        if (typeof stepIndex !== 'undefined') {
+            currentStep = steps[stepIndex];
+            
+            // Remove active class from all steps
+            steps.forEach(step => step.classList.remove('active'));
+            // Add active class to current step
+            currentStep.classList.add('active');
+            
+            // Update progress bar
+            const progressBar = currentStep.querySelector('.progress-bar');
+            if (progressBar) {
+                progressBar.style.width = `${data.progress}%`;
+            }
+
+            // Update step status
+            steps.forEach((step, index) => {
+                if (index < stepIndex) {
+                    step.classList.add('completed');
+                    const prevProgressBar = step.querySelector('.progress-bar');
+                    if (prevProgressBar) {
+                        prevProgressBar.style.width = '100%';
+                    }
+                }
+            });
         }
     }
 }
-
 // Show deployment complete
 function showDeploymentComplete(data) {
     // Update all progress steps to completed
@@ -784,53 +1378,31 @@ function showDeploymentComplete(data) {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
                             <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-700">
-                                    <i class="fas fa-phone-alt text-koko-purple-500 mr-2"></i>
-                                    Phone Number
-                                </span>
-                                <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedPhoneNumber">
-                                    ${data.phoneNumber}
-                                </span>
+                                <span class="text-sm font-medium text-gray-700">Phone Number</span>
+                                <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedPhoneNumber"></span>
                             </div>
                         </div>
 
                         <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
                             <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-700">
-                                    <i class="fas fa-globe text-koko-purple-500 mr-2"></i>
-                                    Service URL
-                                </span>
-                                <a href="${data.serviceUrl}" target="_blank" 
-                                   class="text-sm font-mono text-koko-purple-600 hover:text-koko-purple-700 bg-gray-50 px-3 py-1 rounded">
-                                    ${data.serviceUrl.split('//')[1]}
-                                </a>
+                                <span class="text-sm font-medium text-gray-700">Service URL</span>
+                                <a href="#" class="text-sm font-mono text-koko-purple-600 hover:text-koko-purple-700" id="deployedServiceUrl" target="_blank"></a>
                             </div>
                         </div>
 
                         <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
                             <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-700">
-                                    <i class="fas fa-user text-koko-purple-500 mr-2"></i>
-                                    Username
-                                </span>
-                                <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedUsername">
-                                    ${data.username}
-                                </span>
+                                <span class="text-sm font-medium text-gray-700">Username</span>
+                                <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedUsername"></span>
                             </div>
                         </div>
 
                         <div class="bg-white p-4 rounded-lg border border-koko-purple-200 shadow-sm">
                             <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-700">
-                                    <i class="fas fa-key text-koko-purple-500 mr-2"></i>
-                                    Password
-                                </span>
+                                <span class="text-sm font-medium text-gray-700">Password</span>
                                 <div class="flex items-center space-x-2">
-                                    <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedPassword">
-                                        ••••••••
-                                    </span>
-                                    <button onclick="togglePassword('deployed')" 
-                                            class="text-koko-purple-600 hover:text-koko-purple-700">
+                                    <span class="text-sm font-mono bg-gray-50 px-3 py-1 rounded" id="deployedPassword">••••••••</span>
+                                    <button onclick="togglePassword('deployed')" class="text-koko-purple-600 hover:text-koko-purple-700">
                                         <i class="fas fa-eye"></i>
                                     </button>
                                 </div>
@@ -839,7 +1411,7 @@ function showDeploymentComplete(data) {
                     </div>
 
                     <!-- Warning Message -->
-                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
                         <div class="flex">
                             <div class="flex-shrink-0">
                                 <i class="fas fa-exclamation-triangle text-yellow-400"></i>
@@ -853,16 +1425,14 @@ function showDeploymentComplete(data) {
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="flex justify-end space-x-4 mt-8">
-                        <button onclick="copyCredentials()" 
-                                class="flex items-center px-4 py-2 border border-koko-purple-200 rounded-lg text-koko-purple-600 hover:bg-koko-purple-50 transition-colors duration-200">
+                    <div class="flex justify-end space-x-4">
+                        <button onclick="copyCredentials()" class="btn-secondary">
                             <i class="fas fa-copy mr-2"></i>
                             Copy Credentials
                         </button>
-                        <button onclick="window.location.href='/dashboard#deployed-bots'" 
-                                class="flex items-center px-4 py-2 bg-koko-purple-600 text-white rounded-lg hover:bg-koko-purple-700 transition-colors duration-200">
-                            <i class="fas fa-robot mr-2"></i>
-                            View Deployed Bots
+                        <button onclick="window.location.href='/dashboard'" class="btn-primary">
+                            <i class="fas fa-tachometer-alt mr-2"></i>
+                            Go to Dashboard
                         </button>
                     </div>
                 </div>
@@ -887,6 +1457,9 @@ function showDeploymentComplete(data) {
 
 // Show deployment error
 function showDeploymentError(error) {
+    // Clean up deployment storage
+    localStorage.removeItem(DEPLOYMENT_STORAGE_KEY);
+    
     const errorMessage = document.createElement('div');
     errorMessage.className = 'bg-red-50 border-l-4 border-red-500 p-4 my-4';
     errorMessage.innerHTML = `
@@ -949,11 +1522,6 @@ function copyCredentials() {
     navigator.clipboard.writeText(text)
         .then(() => showToast('Credentials copied to clipboard', 'success'))
         .catch(() => showToast('Failed to copy credentials', 'error'));
-}
-
-// Add dashboard navigation
-function viewDashboard() {
-    window.location.href = '/dashboard';
 }
 
 // Update the plan selection handler
@@ -1230,3 +1798,162 @@ function startCelebration() {
         tsParticles.destroy();
     }, 3000);
 }
+
+// Add this function to handle quick test setup
+function setupQuickTest() {
+    const quickTestButton = document.getElementById('quickTestButton');
+    console.log('Setting up quick test button:', quickTestButton);
+    if (quickTestButton) {
+        quickTestButton.addEventListener('click', handleQuickTest);
+        console.log('Quick test button event listener attached');
+    }
+}
+
+// Add this function to handle quick test
+async function handleQuickTest() {
+    console.log('Quick test button clicked');
+    
+    // Store quick test data in state
+    state.formData = { ...quickTestData };
+    console.log('State updated with quick test data:', state.formData);
+    
+    try {
+        console.log('Starting quick test deployment...');
+        // Start deployment
+        const response = await fetch('/create-bot', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'x-session-settings': JSON.stringify({
+                    isActive: true,
+                    SKIP_PAYMENT: true,
+                    IS_MOCK: false,
+                    DISABLE_FAUX_TIMERS: true
+                })
+            },
+            body: JSON.stringify(state.formData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to start deployment: ${response.statusText}`);
+        }
+
+        const { requestId } = await response.json();
+        console.log('Received requestId:', requestId);
+        state.currentRequestId = requestId;
+
+        // Save deployment state
+        localStorage.setItem(DEPLOYMENT_STORAGE_KEY, JSON.stringify({
+            requestId,
+            formData: state.formData,
+            timestamp: Date.now()
+        }));
+
+        // Update URL with requestId and step
+        const baseUrl = window.location.pathname;
+        const newUrl = `${baseUrl}?step=4&requestId=${requestId}`;
+        window.history.pushState({ step: 4, requestId }, '', newUrl);
+
+        // Skip to deployment step
+        updateStepIndicator(4);
+        
+        // Show deployment progress UI
+        showDeploymentUI();
+        
+        // Start listening for deployment updates
+        startEventStream(requestId);
+
+    } catch (error) {
+        console.error('Quick test deployment error:', error);
+        showToast('Deployment failed: ' + error.message, 'error');
+    }
+}
+
+// Add this helper function to show deployment UI
+function showDeploymentUI() {
+    const formContent = document.getElementById('formContent');
+    formContent.innerHTML = `
+        <div class="space-y-8">
+            <!-- Progress Steps Container -->
+            <div id="progressSteps">
+                <!-- Progress steps will be inserted here -->
+            </div>
+
+            <!-- Deployment Complete Section -->
+            <div id="deploymentComplete" class="mt-8" style="display: none;">
+                <!-- Completion content will be inserted here -->
+            </div>
+        </div>
+    `;
+
+    // Initialize progress steps
+    initializeProgressSteps();
+}
+
+// Add function to check for ongoing deployment
+function checkOngoingDeployment() {
+    const deploymentData = localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
+    
+    if (deploymentData) {
+        try {
+            const deploymentState = JSON.parse(deploymentData);
+            const { requestId, formData, completionData, timestamp, status, lastKnownState } = deploymentState;
+            const age = Date.now() - timestamp;
+            
+            // Clear if older than 12 hours
+            if (age > DEPLOYMENT_EXPIRY_TIME) {
+                console.log('Deployment state expired, clearing...');
+                localStorage.removeItem(DEPLOYMENT_STORAGE_KEY);
+                localStorage.removeItem(DEPLOYMENT_PROGRESS_KEY);
+                initializeBotTypeSelection();
+                return;
+            }
+
+            console.log('Found deployment state:', deploymentState);
+            
+            // Restore deployment state
+            state.formData = formData;
+            state.currentRequestId = requestId;
+            
+            // Skip to deployment step
+            updateStepIndicator(4);
+            
+            // Show deployment UI
+            showDeploymentUI();
+
+            // If deployment was completed, show completion state
+            if (status === 'completed' && completionData) {
+                console.log('Restoring completed deployment state');
+                handleDeploymentComplete(completionData);
+                
+                // Also update progress steps to show the journey
+                if (lastKnownState) {
+                    updateProgressStep(lastKnownState);
+                }
+                return;
+            }
+            
+            // For in-progress deployments, show last known state
+            if (lastKnownState) {
+                console.log('Restoring last known state:', lastKnownState);
+                updateProgressStep(lastKnownState);
+            }
+            
+            // Reconnect to SSE
+            const token = localStorage.getItem('token');
+            if (token) {
+                console.log('Reconnecting to SSE with requestId:', requestId);
+                startEventStream(requestId, token);
+            }
+        } catch (error) {
+            console.error('Error restoring deployment state:', error);
+            localStorage.removeItem(DEPLOYMENT_STORAGE_KEY);
+            localStorage.removeItem(DEPLOYMENT_PROGRESS_KEY);
+            initializeBotTypeSelection();
+        }
+    }
+}
+
+
+

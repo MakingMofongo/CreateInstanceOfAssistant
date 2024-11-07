@@ -13,7 +13,7 @@ exports.protect = async (req, res, next) => {
                 if (settings.isActive) {
                     isMockMode = settings.IS_MOCK;
                 }
-            } catch (error) {
+            } catch (error) {   
                 console.error('Error parsing session settings:', error);
             }
         }

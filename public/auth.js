@@ -11,16 +11,8 @@ function handleAuth(endpoint) {
             const { isMock } = await response.json();
 
             if (isMock) {
-                // In mock mode, use test credentials
                 localStorage.setItem('token', 'mock_token');
-                // Check for redirect after login
-                const redirectTo = sessionStorage.getItem('redirectAfterLogin');
-                if (redirectTo === '/new') {
-                    sessionStorage.removeItem('redirectAfterLogin');
-                    window.location.href = '/new';
-                } else {
-                    window.location.href = 'index.html';
-                }
+                handlePostLoginNavigation();
                 return;
             }
 
@@ -38,20 +30,34 @@ function handleAuth(endpoint) {
 
             const { token } = await authResponse.json();
             localStorage.setItem('token', token);
-            
-            // Check for redirect after login
-            const redirectTo = sessionStorage.getItem('redirectAfterLogin');
-            if (redirectTo === '/new') {
-                sessionStorage.removeItem('redirectAfterLogin');
-                window.location.href = `/new?token=${token}`;
-            } else {
-                window.location.href = 'index.html';
-            }
+            handlePostLoginNavigation();
         } catch (error) {
             alert(error.message);
         }
     };
 }
 
-document.getElementById('loginForm')?.addEventListener('submit', handleAuth('login'));
-document.getElementById('signupForm')?.addEventListener('submit', handleAuth('signup'));
+function handlePostLoginNavigation() {
+    const useClassicVersion = sessionStorage.getItem('useClassicVersion') === 'true';
+    const token = localStorage.getItem('token');
+    
+    if (useClassicVersion) {
+        window.location.href = '/dashboard';
+    } else {
+        // Add token to the URL when redirecting to new version
+        window.location.href = `/new?token=${token}`;
+    }
+}
+
+// Make sure we have one single event listener for the form
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleAuth('login'));
+    }
+    
+    const signupForm = document.getElementById('signupForm');
+    if (signupForm) {
+        signupForm.addEventListener('submit', handleAuth('signup'));
+    }
+});

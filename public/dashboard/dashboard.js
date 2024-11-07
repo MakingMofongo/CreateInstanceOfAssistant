@@ -15,8 +15,13 @@ class Dashboard {
     }
 
     async checkAuth() {
+        if (ENV.IS_MOCK) {
+            await this.updateUserDisplay();
+            return true;
+        }
+
         const token = localStorage.getItem('token');
-        if (!token && process.env.IS_MOCK !== 'true') {
+        if (!token) {
             window.location.href = '/login';
             return false;
         }
@@ -25,7 +30,7 @@ class Dashboard {
             const response = await fetch('/api/user', {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
-                    ...getRequestHeaders()
+                    'Accept': 'application/json'
                 }
             });
             
@@ -44,8 +49,21 @@ class Dashboard {
 
     async updateUserDisplay() {
         try {
+            if (ENV.IS_MOCK) {
+                const userSection = document.getElementById('userSection');
+                const userName = document.getElementById('userName');
+                if (userSection && userName) {
+                    userSection.classList.remove('hidden');
+                    userName.textContent = 'Demo User';
+                }
+                return;
+            }
+
             const response = await fetch('/api/user', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                headers: { 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Accept': 'application/json'
+                }
             });
             const userData = await response.json();
             
@@ -64,17 +82,57 @@ class Dashboard {
 
     async fetchAndDisplayBots() {
         try {
+            console.log('Fetching bots...');
+            
+            if (ENV.IS_MOCK) {
+                const mockBots = [
+                    {
+                        _id: 'mock_1',
+                        name: 'Hilton Demo Bot',
+                        type: 'Hotel',
+                        status: 'RUNNING',
+                        createdAt: new Date(),
+                        metrics: {
+                            callCount: Math.floor(Math.random() * 100),
+                            uptime: '99.9%',
+                            responseTime: '2.5s'
+                        }
+                    },
+                    {
+                        _id: 'mock_2',
+                        name: 'Hospital Demo Bot',
+                        type: 'Hospital',
+                        status: 'RUNNING',
+                        createdAt: new Date(),
+                        metrics: {
+                            callCount: Math.floor(Math.random() * 100),
+                            uptime: '99.9%',
+                            responseTime: '2.5s'
+                        }
+                    }
+                ];
+                this.renderBotsList(mockBots);
+                this.updateStats(mockBots);
+                return;
+            }
+
             const token = localStorage.getItem('token');
             const response = await fetch('/api/bots', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
             });
 
+            console.log('Response status:', response.status);
+            
             if (!response.ok) {
-                throw new Error('Failed to fetch bots');
+                throw new Error(`Failed to fetch bots: ${response.status}`);
             }
 
             const bots = await response.json();
-            console.log('Fetched bots:', bots); // Debug log
+            console.log('Fetched bots:', bots);
+            
             this.renderBotsList(bots);
             this.updateStats(bots);
         } catch (error) {
@@ -335,6 +393,23 @@ class Dashboard {
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }
+
+    initializeEventListeners() {
+        // Handle logout
+        const logoutButton = document.querySelector('[onclick="handleLogout()"]');
+        if (logoutButton) {
+            logoutButton.onclick = () => {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+            };
+        }
+
+        // Handle refresh
+        const refreshButton = document.querySelector('.refresh-button');
+        if (refreshButton) {
+            refreshButton.onclick = () => this.fetchAndDisplayBots();
+        }
+    }
 }
 
 // Initialize dashboard
@@ -360,4 +435,18 @@ async function redeployBot(botId) {
         console.error('Error redeploying bot:', error);
         showToast('Failed to redeploy bot', 'error');
     }
+}
+
+// Add this helper function
+function getRequestHeaders() {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    const token = localStorage.getItem('token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
 }
